@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="GramMart AI">
+  <rect width="128" height="128" rx="24" fill="#138a4b"/>
+  <path d="M28 74c0-20 16-36 36-36s36 16 36 36v14H28V74z" fill="#f7d46f"/>
+  <path d="M45 59h38v29H45z" fill="#fff"/>
+  <path d="M54 47c0-8 4-15 10-20 6 5 10 12 10 20H54z" fill="#fff"/>
+  <circle cx="64" cy="71" r="9" fill="#138a4b"/>
+</svg>
+
