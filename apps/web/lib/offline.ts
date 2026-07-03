@@ -1,20 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-type OfflineCommand = {
-  type: string;
-  payload: unknown;
-  createdAt: string;
-};
-
-const QUEUE_KEY = "grammart:offline-command-queue";
+import { addQueueItem, getQueueItems, clearQueueItems, OfflineCommand } from "./db";
 
 export function useNetworkStatus() {
   const [online, setOnline] = useState(true);
 
   useEffect(() => {
-    setOnline(navigator.onLine);
+    if (typeof navigator !== "undefined") {
+      setOnline(navigator.onLine);
+    }
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
     window.addEventListener("online", handleOnline);
@@ -28,30 +23,22 @@ export function useNetworkStatus() {
   return online;
 }
 
-export function enqueueOfflineCommand(command: OfflineCommand) {
-  const existing = readQueue();
-  localStorage.setItem(QUEUE_KEY, JSON.stringify([...existing, command]));
+export async function enqueueOfflineCommand(command: OfflineCommand): Promise<void> {
+  await addQueueItem(command);
 }
 
-export function readQueue(): OfflineCommand[] {
-  if (typeof localStorage === "undefined") {
-    return [];
-  }
-  try {
-    return JSON.parse(localStorage.getItem(QUEUE_KEY) ?? "[]") as OfflineCommand[];
-  } catch {
-    return [];
-  }
+export async function readQueue(): Promise<OfflineCommand[]> {
+  return await getQueueItems();
 }
 
-export function clearQueue() {
-  localStorage.removeItem(QUEUE_KEY);
+export async function clearQueue(): Promise<void> {
+  await clearQueueItems();
 }
 
 import { pushOfflineSync } from "./api";
 
 export async function syncOfflineQueue() {
-  const queue = readQueue();
+  const queue = await readQueue();
   if (queue.length === 0) return;
   if (typeof navigator !== "undefined" && !navigator.onLine) return;
 
@@ -64,7 +51,7 @@ export async function syncOfflineQueue() {
   try {
     const response = await pushOfflineSync(operations);
     if (response && response.results) {
-      clearQueue();
+      await clearQueue();
       return response.results;
     }
   } catch (error) {

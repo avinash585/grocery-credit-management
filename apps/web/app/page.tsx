@@ -92,9 +92,39 @@ function RuralRetailOS() {
     quantity?: string;
   } | null>(null);
   const [aiQueryOverride, setAiQueryOverride] = useState("");
+  const [merchantUpiId, setMerchantUpiId] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("grammart:merchant-upi-id") ?? "grammart@ybl";
+    }
+    return "grammart@ybl";
+  });
+
+  const handleUpdateUpiId = (id: string) => {
+    setMerchantUpiId(id);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("grammart:merchant-upi-id", id);
+    }
+  };
   const online = useNetworkStatus();
   const copy = useMemo(() => t(language), [language]);
-  const queueSize = readQueue().length;
+  const [queueSize, setQueueSize] = useState(0);
+
+  useEffect(() => {
+    const updateCount = () => {
+      readQueue()
+        .then(q => setQueueSize(q.length))
+        .catch(() => setQueueSize(0));
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("offline-queue-changed", updateCount);
+    }
+    updateCount();
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("offline-queue-changed", updateCount);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (online) {
@@ -664,6 +694,9 @@ function RuralRetailOS() {
               setVoiceQuantity("1");
               setStatus("Voice action cancelled.");
             }}
+            merchantUpiId={merchantUpiId}
+            onChangeUpiId={handleUpdateUpiId}
+            language={language}
           />
         </section>
 
@@ -728,18 +761,21 @@ function CustomerWorkspace(props: {
   pendingVoiceCommand: { intent: string; customerName?: string; productAlias?: string; amount?: string; quantity?: string } | null;
   onConfirmVoice: () => void;
   onCancelVoice: () => void;
+  merchantUpiId: string;
+  onChangeUpiId: (id: string) => void;
+  language: Language;
 }) {
   const { customer, customers, activeTask, onTask, view } = props;
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="min-h-[640px] rounded-md bg-white p-4 shadow-soft">
       {view === "admin" ? (
-        <AdminPanel customers={customers} status={props.status} demoMode={props.demoMode} hasToken={props.hasToken} onView={props.onView} copy={props.copy} />
+        <AdminPanel customers={customers} status={props.status} demoMode={props.demoMode} hasToken={props.hasToken} onView={props.onView} copy={props.copy} merchantUpiId={props.merchantUpiId} onChangeUpiId={props.onChangeUpiId} />
       ) : view === "customers" ? (
         <CustomerDirectory customers={customers} onOpenCustomer={props.onOpenCustomer} copy={props.copy} />
       ) : view === "products" ? (
         <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} />
       ) : view === "ai" && !customer ? (
-        <AdminInsights customers={customers} transcript={props.transcript} copy={props.copy} />
+        <AdminInsights customers={customers} products={props.products} language={props.language} transcript={props.transcript} copy={props.copy} />
       ) : !customer ? (
         <div className="flex min-h-[560px] flex-col justify-between rounded-md bg-leaf-50 p-5">
           <div>
@@ -786,7 +822,18 @@ function CustomerWorkspace(props: {
           <div className="rounded-md border border-leaf-100 bg-[#fbfcf8] p-4">
             {activeTask === "products" && <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} />}
             {activeTask === "credit" && <CreditPanel product={props.selectedProduct} onSubmit={props.onCreditSubmit} onFindProduct={() => { props.onView("products"); onTask("products"); }} busy={props.busy} copy={props.copy} value={props.voiceQuantity} onChange={props.setVoiceQuantity} />}
-            {activeTask === "payment" && <PaymentPanel onSubmit={props.onPaymentSubmit} busy={props.busy} copy={props.copy} value={props.voiceAmount} onChange={props.setVoiceAmount} />}
+            {activeTask === "payment" && (
+              <PaymentPanel
+                onSubmit={props.onPaymentSubmit}
+                busy={props.busy}
+                copy={props.copy}
+                value={props.voiceAmount}
+                onChange={props.setVoiceAmount}
+                customerName={customer.name}
+                outstandingBalance={customer.outstandingBalance ?? "0"}
+                merchantUpiId={props.merchantUpiId}
+              />
+            )}
             {(view === "ai" || activeTask === "ai") && <InlineAI customer={customer} transcript={props.transcript} copy={props.copy} />}
           </div>
 
@@ -800,7 +847,25 @@ function CustomerWorkspace(props: {
   );
 }
 
-function AdminPanel({ customers, status, demoMode, hasToken, onView, copy }: { customers: Customer[]; status: string; demoMode: boolean; hasToken: boolean; onView: (view: View) => void; copy: ReturnType<typeof t> }) {
+function AdminPanel({
+  customers,
+  status,
+  demoMode,
+  hasToken,
+  onView,
+  copy,
+  merchantUpiId,
+  onChangeUpiId
+}: {
+  customers: Customer[];
+  status: string;
+  demoMode: boolean;
+  hasToken: boolean;
+  onView: (view: View) => void;
+  copy: ReturnType<typeof t>;
+  merchantUpiId: string;
+  onChangeUpiId: (id: string) => void;
+}) {
   const pending = customers.reduce((sum, customer) => sum + Number(customer.outstandingBalance ?? "0"), 0);
   return (
     <div className="space-y-4">
@@ -814,6 +879,22 @@ function AdminPanel({ customers, status, demoMode, hasToken, onView, copy }: { c
         <AdminMetric label={copy.pendingCredit} value={`Rs.${pending.toFixed(0)}`} />
         <AdminMetric label={copy.system} value={demoMode ? copy.demo : hasToken ? copy.connected : copy.locked} />
       </div>
+
+      <div className="rounded-md border border-leaf-100 bg-[#fbfcf8] p-4">
+        <h3 className="text-lg font-black text-leaf-900">UPI Payment Settings</h3>
+        <p className="text-sm text-ink/75 font-semibold mt-1">Configure the shop's UPI ID (VPA) to receive credit settlements directly.</p>
+        <div className="mt-3">
+          <label className="block text-xs font-black uppercase tracking-wider text-ink/65">Merchant UPI ID</label>
+          <input
+            type="text"
+            value={merchantUpiId}
+            onChange={(e) => onChangeUpiId(e.target.value)}
+            placeholder="e.g. shopname@upi"
+            className="mt-1 min-h-11 w-full rounded-md border border-leaf-100 bg-white px-3 font-bold text-ink outline-none focus:border-leaf-600"
+          />
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <AdminAction icon={UsersRound} title={copy.viewCustomerDetails} text={copy.viewCustomerDetailsHint} onClick={() => onView("customers")} />
         <AdminAction icon={ReceiptText} title={copy.startBilling} text={copy.startBillingHint} onClick={() => onView("billing")} />
@@ -841,21 +922,114 @@ function CustomerDirectory({ customers, onOpenCustomer, copy }: { customers: Cus
   );
 }
 
-function AdminInsights({ customers, transcript, copy }: { customers: Customer[]; transcript: string; copy: ReturnType<typeof t> }) {
+function AdminInsights({
+  customers,
+  products,
+  language,
+  transcript,
+  copy
+}: {
+  customers: Customer[];
+  products: Product[];
+  language: Language;
+  transcript: string;
+  copy: ReturnType<typeof t>;
+}) {
   const totalPending = customers.reduce((sum, customer) => sum + Number(customer.outstandingBalance ?? "0"), 0);
   const topCustomer = [...customers].sort((a, b) => Number(b.outstandingBalance ?? "0") - Number(a.outstandingBalance ?? "0"))[0];
+
+  const [alerts, setAlerts] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    async function loadAlerts() {
+      try {
+        const response = await chatWithAi({
+          message: "Analyze the current product catalog and customer listings. Suggest exactly 3 brief, predictive inventory restocking alerts or sales tips for the shopkeeper. Keep each point under 12 words. Make them specific (e.g., 'Stock up on Sunflower Oil, weddings are starting' or 'Restock Sugar, credit sales are high').",
+          language,
+          customers,
+          products
+        });
+        if (active && response?.answer) {
+          const points = response.answer
+            .split(/\n+/)
+            .map(p => p.replace(/^[-*•\d.\s]+/, "").trim())
+            .filter(Boolean)
+            .slice(0, 3);
+          setAlerts(points.length > 0 ? points : [
+            "Restock Sugar: credit requests are rising",
+            "Order Sunflower Oil: wedding season demand expected",
+            "Detergent stock is low: check Lakshmi account dues"
+          ]);
+        }
+      } catch {
+        if (active) {
+          setAlerts([
+            "Restock Sugar: credit requests are rising",
+            "Order Sunflower Oil: wedding season demand expected",
+            "Detergent stock is low: check Lakshmi account dues"
+          ]);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadAlerts();
+    return () => { active = false; };
+  }, [customers, products, language]);
+
   return (
     <div className="space-y-4">
       <div className="rounded-md bg-ink p-5 text-white">
-        <p className="text-sm font-black uppercase tracking-wide text-white/60">{copy.aiInsights}</p>
-        <h2 className="mt-2 text-4xl font-black">{copy.shopAssistant}</h2>
-        <p className="mt-2 text-lg font-semibold text-white/70">{copy.aiInsightsHint}</p>
+        <p className="text-sm font-black uppercase tracking-wide text-white/60">{copy.insightsAndReports}</p>
+        <h2 className="mt-2 text-4xl font-black">{copy.aiAnalytics}</h2>
       </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
-        <AssistantBubble text={`Total pending credit is Rs.${totalPending.toFixed(2)}.`} />
-        <AssistantBubble text={topCustomer ? `${topCustomer.name} has the highest balance: Rs.${topCustomer.outstandingBalance}.` : copy.noCustomerBalances} />
-        <AssistantBubble text={copy.suggestedNextStep} />
-        <AssistantBubble text={transcript ? `Voice: ${transcript}` : copy.waitingForVoice} />
+        <div className="rounded-md bg-leaf-50 p-4">
+          <p className="text-sm font-black uppercase tracking-wide text-leaf-700">{copy.outstandingCredit}</p>
+          <p className="mt-1 text-3xl font-black">Rs.{totalPending.toFixed(2)}</p>
+        </div>
+        <div className="rounded-md bg-leaf-50 p-4">
+          <p className="text-sm font-black uppercase tracking-wide text-leaf-700">{copy.highestPending}</p>
+          {topCustomer && Number(topCustomer.outstandingBalance) > 0 ? (
+            <div>
+              <p className="mt-1 text-xl font-black leading-none">{topCustomer.name}</p>
+              <p className="mt-1 text-base font-bold text-ink/70">Rs.{topCustomer.outstandingBalance}</p>
+            </div>
+          ) : (
+            <p className="mt-1 text-lg font-bold text-ink/65">{copy.noPendingBalance}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-md border-2 border-leaf-600 bg-[#f7fbf2] p-5 shadow-soft">
+        <h3 className="flex items-center gap-2 text-xl font-black text-leaf-900">
+          <Sparkles className="h-5 w-5 text-leaf-600 animate-pulse" aria-hidden />
+          AI Smart Replenishment Alerts
+        </h3>
+
+        {loading ? (
+          <div className="mt-3 space-y-2 animate-pulse">
+            <div className="h-4 w-11/12 rounded bg-leaf-100"></div>
+            <div className="h-4 w-10/12 rounded bg-leaf-100"></div>
+            <div className="h-4 w-9/12 rounded bg-leaf-100"></div>
+          </div>
+        ) : (
+          <ul className="mt-3 space-y-2 text-base font-bold text-ink/80 list-inside list-disc">
+            {alerts.map((alert, idx) => (
+              <li key={idx} className="leading-snug">
+                {alert}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="rounded-md bg-leaf-50 p-4">
+        <p className="text-sm font-black uppercase tracking-wide text-leaf-700">{copy.insightsStatus}</p>
+        <p className="mt-1 text-lg font-bold">{transcript ? `Voice: ${transcript}` : copy.insightsHint}</p>
       </div>
     </div>
   );
@@ -899,14 +1073,80 @@ function CreditPanel({ product, onSubmit, onFindProduct, busy, copy, value, onCh
   );
 }
 
-function PaymentPanel({ onSubmit, busy, copy, value, onChange }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void; busy: boolean; copy: ReturnType<typeof t>; value: string; onChange: (val: string) => void }) {
+function PaymentPanel({
+  onSubmit,
+  busy,
+  copy,
+  value,
+  onChange,
+  customerName,
+  outstandingBalance,
+  merchantUpiId
+}: {
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  busy: boolean;
+  copy: ReturnType<typeof t>;
+  value: string;
+  onChange: (val: string) => void;
+  customerName: string;
+  outstandingBalance: string;
+  merchantUpiId: string;
+}) {
+  const [showQr, setShowQr] = useState(false);
+  const payAmount = value || outstandingBalance || "0";
+
+  const upiUrl = `upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent("GramMart Merchant")}&am=${encodeURIComponent(payAmount)}&cu=INR&tn=${encodeURIComponent("Credit payoff for " + customerName)}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUrl)}`;
+
   return (
     <div>
-      <h3 className="text-2xl font-black">{copy.receivePayment}</h3>
+      <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+        <h3 className="text-2xl font-black">{copy.receivePayment}</h3>
+        {Number(outstandingBalance) > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange(outstandingBalance)}
+            className="text-sm font-black text-leaf-700 hover:text-leaf-800 underline text-left animate-pulse"
+          >
+            Fill Full Dues (Rs.{outstandingBalance})
+          </button>
+        )}
+      </div>
+
       <form onSubmit={onSubmit} className="mt-3 flex flex-col gap-3 sm:flex-row">
         <Input name="amount" label={copy.amountReceived} value={value} onChange={(e) => onChange(e.target.value)} />
-        <button disabled={busy} className="min-h-14 rounded-md bg-leaf-600 px-5 font-black text-white disabled:opacity-60">{copy.savePayment}</button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setShowQr(!showQr)}
+            className="min-h-14 rounded-md border-2 border-leaf-600 bg-white px-4 font-black text-leaf-700 hover:bg-leaf-50 transition"
+          >
+            {showQr ? "Hide QR" : "Show UPI QR"}
+          </button>
+          <button disabled={busy} className="min-h-14 flex-1 rounded-md bg-leaf-600 px-5 font-black text-white disabled:opacity-60">
+            {copy.savePayment}
+          </button>
+        </div>
       </form>
+
+      {showQr && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4 flex flex-col items-center gap-3 rounded-md border-2 border-leaf-100 bg-[#f7fbf2] p-5 text-center"
+        >
+          <div className="rounded-md bg-white p-3 shadow-sm border border-leaf-200">
+            <img src={qrCodeUrl} alt="UPI QR Code" className="h-44 w-44 object-contain" />
+          </div>
+          <div>
+            <p className="text-base font-black text-leaf-900">Scan to Pay: Rs.{payAmount}</p>
+            <p className="text-xs font-bold text-ink/60 mt-1">UPI ID: {merchantUpiId}</p>
+            <p className="text-xs font-bold text-ink/50 mt-1 max-w-sm">
+              Use GPay, PhonePe, Paytm, or any banking app to scan this QR code. Once payment succeeds, click "{copy.savePayment}" to register.
+            </p>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

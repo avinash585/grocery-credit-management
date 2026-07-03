@@ -1,5 +1,6 @@
 import type { Language } from "@/lib/i18n";
 import { enqueueOfflineCommand } from "@/lib/offline";
+import { cacheCustomers, getCachedCustomers, cacheProducts, getCachedProducts } from "./db";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api";
 
@@ -109,12 +110,46 @@ export function createCustomer(payload: { name: string; phone?: string; preferre
   }, { type: "CREATE_CUSTOMER", payload });
 }
 
-export function searchCustomers(query: string) {
-  return apiFetch<Customer[]>(`/customers?query=${encodeURIComponent(query)}`);
+export async function searchCustomers(query: string) {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    const cached = await getCachedCustomers();
+    const q = query.toLowerCase().trim();
+    if (!q) return cached;
+    return cached.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
+  }
+  try {
+    const results = await apiFetch<Customer[]>(`/customers?query=${encodeURIComponent(query)}`);
+    if (results && !query) {
+      void cacheCustomers(results);
+    }
+    return results;
+  } catch (err) {
+    const cached = await getCachedCustomers();
+    const q = query.toLowerCase().trim();
+    if (!q) return cached;
+    return cached.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
+  }
 }
 
-export function searchProducts(query: string) {
-  return apiFetch<Product[]>(`/products?query=${encodeURIComponent(query)}`);
+export async function searchProducts(query: string) {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    const cached = await getCachedProducts();
+    const q = query.toLowerCase().trim();
+    if (!q) return cached;
+    return cached.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+  }
+  try {
+    const results = await apiFetch<Product[]>(`/products?query=${encodeURIComponent(query)}`);
+    if (results && !query) {
+      void cacheProducts(results);
+    }
+    return results;
+  } catch (err) {
+    const cached = await getCachedProducts();
+    const q = query.toLowerCase().trim();
+    if (!q) return cached;
+    return cached.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+  }
 }
 
 export function createCreditBill(payload: { customerId: string; creditBill: boolean; items: Array<{ productId: string; quantity: string }> }) {
