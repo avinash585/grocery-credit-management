@@ -47,3 +47,28 @@ export function readQueue(): OfflineCommand[] {
 export function clearQueue() {
   localStorage.removeItem(QUEUE_KEY);
 }
+
+import { pushOfflineSync } from "./api";
+
+export async function syncOfflineQueue() {
+  const queue = readQueue();
+  if (queue.length === 0) return;
+  if (typeof navigator !== "undefined" && !navigator.onLine) return;
+
+  const operations = queue.map((cmd, idx) => ({
+    clientOperationId: `offline-${cmd.createdAt}-${idx}`,
+    type: cmd.type,
+    payload: JSON.stringify(cmd.payload)
+  }));
+
+  try {
+    const response = await pushOfflineSync(operations);
+    if (response && response.results) {
+      clearQueue();
+      return response.results;
+    }
+  } catch (error) {
+    console.error("Offline queue sync failed:", error);
+    throw error;
+  }
+}

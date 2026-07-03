@@ -42,7 +42,7 @@ import {
   searchProducts
 } from "@/lib/api";
 import { Language, t } from "@/lib/i18n";
-import { readQueue, useNetworkStatus } from "@/lib/offline";
+import { readQueue, useNetworkStatus, syncOfflineQueue } from "@/lib/offline";
 
 const queryClient = new QueryClient();
 type Task = "credit" | "payment" | "products" | "ai";
@@ -95,6 +95,27 @@ function RuralRetailOS() {
   const online = useNetworkStatus();
   const copy = useMemo(() => t(language), [language]);
   const queueSize = readQueue().length;
+
+  useEffect(() => {
+    if (online) {
+      syncOfflineQueue()
+        .then((results) => {
+          if (results && results.length > 0) {
+            setStatus(`Offline queue synced successfully: ${results.length} action(s) uploaded.`);
+            if (!demoMode && getToken()) {
+              searchCustomers("")
+                .then((res) => {
+                  if (res) setCustomers(res);
+                })
+                .catch((e) => console.error("Refresh directory failed:", e));
+            }
+          }
+        })
+        .catch((err) => {
+          setStatus(`Failed to upload offline queue: ${err.message}`);
+        });
+    }
+  }, [online, demoMode]);
 
   function requireSession() {
     if (!getToken() && !demoMode) {

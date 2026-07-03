@@ -178,3 +178,10 @@ export async function parseVoiceCommand(transcript: string, language: Language) 
     quantity?: string;
   }>;
 }
+
+export function pushOfflineSync(operations: Array<{ clientOperationId: string; type: string; payload: string }>) {
+  return apiFetch<{ results: Array<{ clientOperationId: string; status: string }> }>("/sync/push", {
+    method: "POST",
+    body: JSON.stringify({ operations })
+  });
+}
