@@ -982,24 +982,25 @@ function AdminInsights({
   return (
     <div className="space-y-4">
       <div className="rounded-md bg-ink p-5 text-white">
-        <p className="text-sm font-black uppercase tracking-wide text-white/60">{copy.insightsAndReports}</p>
-        <h2 className="mt-2 text-4xl font-black">{copy.aiAnalytics}</h2>
+        <p className="text-sm font-black uppercase tracking-wide text-white/60">{copy.aiInsights}</p>
+        <h2 className="mt-2 text-4xl font-black">{copy.shopAssistant}</h2>
+        <p className="mt-2 text-lg font-semibold text-white/70">{copy.aiInsightsHint}</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-md bg-leaf-50 p-4">
-          <p className="text-sm font-black uppercase tracking-wide text-leaf-700">{copy.outstandingCredit}</p>
+          <p className="text-sm font-black uppercase tracking-wide text-leaf-700">Total Outstanding Credit</p>
           <p className="mt-1 text-3xl font-black">Rs.{totalPending.toFixed(2)}</p>
         </div>
         <div className="rounded-md bg-leaf-50 p-4">
-          <p className="text-sm font-black uppercase tracking-wide text-leaf-700">{copy.highestPending}</p>
+          <p className="text-sm font-black uppercase tracking-wide text-leaf-700">Highest Pending Balance</p>
           {topCustomer && Number(topCustomer.outstandingBalance) > 0 ? (
             <div>
               <p className="mt-1 text-xl font-black leading-none">{topCustomer.name}</p>
               <p className="mt-1 text-base font-bold text-ink/70">Rs.{topCustomer.outstandingBalance}</p>
             </div>
           ) : (
-            <p className="mt-1 text-lg font-bold text-ink/65">{copy.noPendingBalance}</p>
+            <p className="mt-1 text-lg font-bold text-ink/65">{copy.noCustomerBalances}</p>
           )}
         </div>
       </div>
@@ -1028,8 +1029,8 @@ function AdminInsights({
       </div>
 
       <div className="rounded-md bg-leaf-50 p-4">
-        <p className="text-sm font-black uppercase tracking-wide text-leaf-700">{copy.insightsStatus}</p>
-        <p className="mt-1 text-lg font-bold">{transcript ? `Voice: ${transcript}` : copy.insightsHint}</p>
+        <p className="text-sm font-black uppercase tracking-wide text-leaf-700">Live Status</p>
+        <p className="mt-1 text-lg font-bold">{transcript ? `Voice: ${transcript}` : copy.waitingForVoice}</p>
       </div>
     </div>
   );
