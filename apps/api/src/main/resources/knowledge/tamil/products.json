@@ -1,0 +1,6 @@
+[
+  { "id": "RICE", "nameEn": "Rice", "nameLocal": "அரிசி", "aliases": ["அரிசி", "சோனா மசூரி அரிசி", "ஆரிசி", "arisi"] },
+  { "id": "SUGAR", "nameEn": "Sugar", "nameLocal": "சர்க்கரை", "aliases": ["சர்க்கரை", "சீனி", "சக்கரை", "sugar"] },
+  { "id": "OIL", "nameEn": "Sunflower Oil", "nameLocal": "சூரியகாந்தி எண்ணெய்", "aliases": ["எண்ணெய்", "சூரியகாந்தி எண்ணெய்", "தேங்காய் எண்ணெய்", "oil"] },
+  { "id": "DAL", "nameEn": "Toor Dal", "nameLocal": "துவரம் பருப்பு", "aliases": ["துவரம் பருப்பு", "பருப்பு", "dal", "paruppu"] }
+]

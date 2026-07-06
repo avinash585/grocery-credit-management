@@ -1,0 +1,6 @@
+[
+  { "id": "RICE", "nameEn": "Rice", "nameLocal": "ಅಕ್ಕಿ", "aliases": ["ಅಕ್ಕಿ", "ಸೋನಾ ಮಸೂರಿ", "akki", "rice"] },
+  { "id": "SUGAR", "nameEn": "Sugar", "nameLocal": "ಸಕ್ಕರೆ", "aliases": ["ಸಕ್ಕರೆ", "ಸೀನಿ", "sakkare", "sugar"] },
+  { "id": "OIL", "nameEn": "Sunflower Oil", "nameLocal": "ಎಣ್ಣೆ", "aliases": ["ಎಣ್ಣೆ", "ಸೂರ್ಯಕಾಂತಿ ಎಣ್ಣೆ", "enne", "oil"] },
+  { "id": "DAL", "nameEn": "Toor Dal", "nameLocal": "ತೊಗರಿ ಬೇಳೆ", "aliases": ["ಬೇಳೆ", "ತೊಗರಿ ಬೇಳೆ", "togari bele", "dal"] }
+]

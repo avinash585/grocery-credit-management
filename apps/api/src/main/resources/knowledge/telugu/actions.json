@@ -1,0 +1,15 @@
+{
+  "OPEN_CUSTOMER": ["తెరవు", "ఓపెన్", "ఖాతా తెరవండి", "open", "kholo"],
+  "ADD_PURCHASE": ["జోడించు", "వేయి", "రాయి", "రాయ్", "add", "jodo"],
+  "REMOVE_ITEM": ["తొలగించు", "వద్దు", "తీసేయి", "raddhu", "remove", "undo"],
+  "RECEIVE_PAYMENT": ["తీసుకో", "చెల్లింపు", "వసూలు", "paid", "receive"],
+  "SEARCH_PRODUCT": ["వెతుకు", "చూడు", "search", "find"],
+  "GENERATE_BILL": ["బిల్లు", "సేవ్", "ఖరారు", "confirm", "bill"],
+  "SEND_SMS": ["గుర్తుచేయి", "పంపు", "sms", "reminder"],
+  "SEND_WHATSAPP": ["వాట్సాప్", "whatsapp", "ping"],
+  "SHOW_LEDGER": ["ఖాతా పుస్తకం", "లెడ్జర్", "ledger"],
+  "SHOW_REPORT": ["నివేదిక", "రిపోర్ట్", "report"],
+  "SHOW_OUTSTANDING": ["బాకీ", "ఉధ్దర", "outstanding"],
+  "CREATE_CUSTOMER": ["కొత్త కస్టమర్", "create customer"],
+  "CREATE_FAMILY": ["కుటుంబం", "create family"]
+}

@@ -1,0 +1,15 @@
+{
+  "OPEN_CUSTOMER": ["open", "view", "show customer", "customer account", "open account"],
+  "ADD_PURCHASE": ["add", "plus", "credit sale", "record purchase", "sell", "give"],
+  "REMOVE_ITEM": ["remove", "delete", "delete last", "undo", "remove product"],
+  "RECEIVE_PAYMENT": ["receive", "payment", "paid", "received", "payment of", "settled"],
+  "SEARCH_PRODUCT": ["find", "search", "lookup", "check product"],
+  "GENERATE_BILL": ["bill", "invoice", "generate bill", "print bill", "confirm"],
+  "SEND_SMS": ["sms", "send sms", "reminder", "send reminder"],
+  "SEND_WHATSAPP": ["whatsapp", "send whatsapp", "ping"],
+  "SHOW_LEDGER": ["ledger", "book", "transactions", "show ledger"],
+  "SHOW_REPORT": ["report", "sales report", "today report", "summary"],
+  "SHOW_OUTSTANDING": ["outstanding", "total pending", "pending credit"],
+  "CREATE_CUSTOMER": ["create customer", "add customer", "new customer", "register"],
+  "CREATE_FAMILY": ["create family", "add family", "family group"]
+}

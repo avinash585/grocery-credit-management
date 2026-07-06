@@ -44,7 +44,8 @@ import {
   registerShop,
   searchCustomers,
   searchProducts,
-  parseVoiceCommand
+  parseVoiceCommand,
+  learnVoiceAlias
 } from "@/lib/api";
 import { Language, t } from "@/lib/i18n";
 import { readQueue, useNetworkStatus, syncOfflineQueue } from "@/lib/offline";
@@ -100,6 +101,20 @@ function RuralRetailOS() {
     quantity?: string;
   } | null>(null);
   const [aiQueryOverride, setAiQueryOverride] = useState("");
+  const [learningWord, setLearningWord] = useState("");
+
+  async function learnAlias(category: "CUSTOMER" | "PRODUCT", canonicalId: string, aliasValue: string) {
+    try {
+      setBusy(true);
+      await learnVoiceAlias(category, canonicalId, aliasValue);
+      setStatus(`Taught alias: "${aliasValue}" represents ${canonicalId}`);
+      setLearningWord("");
+    } catch (e) {
+      setStatus("Failed to save alias. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
   const [merchantUpiId, setMerchantUpiId] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("grammart:merchant-upi-id") ?? "grammart@ybl";
@@ -446,6 +461,101 @@ function RuralRetailOS() {
     });
   }
 
+  async function executeDirectCommand(cmd: {
+    intent: string;
+    customerName?: string;
+    productAlias?: string;
+    amount?: string;
+    quantity?: string;
+  }) {
+    if (!cmd || !cmd.intent) return;
+    const intent = cmd.intent.toUpperCase();
+    if (intent === "OPEN_CUSTOMER" || intent === "ASK_BALANCE" || intent === "SEND_REMINDER") {
+      if (cmd.customerName) {
+        const query = cmd.customerName.toLowerCase().trim();
+        const matched = customers.find(c => c.name.toLowerCase().includes(query) || (c.phone && c.phone.includes(query)));
+        if (matched) {
+          openCustomer(matched);
+          if (intent === "ASK_BALANCE") {
+            setActiveTask("ai");
+            setStatus(`${matched.name}'s balance is Rs.${matched.outstandingBalance}.`);
+          } else if (intent === "SEND_REMINDER") {
+            setStatus(`SMS reminder prepared for ${matched.name}.`);
+          } else {
+            setStatus(`Opened customer account for ${matched.name}.`);
+          }
+        }
+      }
+    } else if (intent === "ADD_PURCHASE") {
+      let currentCust = selectedCustomer;
+      if (cmd.customerName) {
+        const query = cmd.customerName.toLowerCase().trim();
+        const matched = customers.find(c => c.name.toLowerCase().includes(query));
+        if (matched) {
+          openCustomer(matched);
+          currentCust = matched;
+        }
+      }
+      if (!currentCust) return;
+      
+      let matchedProd = selectedProduct;
+      if (cmd.productAlias) {
+        const alias = cmd.productAlias.toLowerCase().trim();
+        const matchedProduct = products.find(p => p.name.toLowerCase().includes(alias) || p.sku.toLowerCase().includes(alias));
+        if (matchedProduct) {
+          setSelectedProduct(matchedProduct);
+          matchedProd = matchedProduct;
+        }
+      }
+      if (!matchedProd) return;
+      
+      let qty = "1";
+      if (cmd.quantity) {
+        const match = cmd.quantity.match(/\d+(\.\d+)?/);
+        qty = match ? match[0] : "1";
+      }
+      
+      setBusy(true);
+      setStatus(`Directly executing: credit sale of ${qty} ${matchedProd.name} for ${currentCust.name}...`);
+      try {
+        await executeSaveCredit(matchedProd, qty);
+        setStatus(`Successfully added ${qty} ${matchedProd.name} to ${currentCust.name}'s account.`);
+      } catch (e) {
+        setStatus("Direct save credit failed.");
+      } finally {
+        setBusy(false);
+      }
+    } else if (intent === "RECEIVE_PAYMENT") {
+      let currentCust = selectedCustomer;
+      if (cmd.customerName) {
+        const query = cmd.customerName.toLowerCase().trim();
+        const matched = customers.find(c => c.name.toLowerCase().includes(query));
+        if (matched) {
+          openCustomer(matched);
+          currentCust = matched;
+        }
+      }
+      if (!currentCust) return;
+      
+      let amt = 0;
+      if (cmd.amount) {
+        amt = Number(cmd.amount);
+      }
+      if (amt <= 0) return;
+      
+      setBusy(true);
+      setStatus(`Directly executing: receiving payment of Rs.${amt} from ${currentCust.name}...`);
+      try {
+        await executeSavePayment(amt);
+        setStatus(`Successfully received payment of Rs.${amt} from ${currentCust.name}.`);
+      } catch (e) {
+        setStatus("Direct save payment failed.");
+      } finally {
+        setBusy(false);
+      }
+    }
+  }
+
   function handleVoiceCommand(cmd: {
     intent: string;
     customerName?: string;
@@ -766,7 +876,15 @@ function RuralRetailOS() {
                 try {
                   const cmd = await parseVoiceCommand(transcript.trim(), language);
                   if (cmd) {
-                    handleVoiceCommand(cmd);
+                    const confidence = cmd.slots?.confidence ?? 0.85;
+                    if (confidence >= 0.95) {
+                      await executeDirectCommand(cmd);
+                    } else if (confidence >= 0.80) {
+                      handleVoiceCommand(cmd);
+                    } else {
+                      setStatus("Confidence too low. Please repeat your query clearly.");
+                      setLearningWord(transcript.trim());
+                    }
                   } else {
                     setStatus("Could not parse command. Try using format like: 'Kumar Stores payment 500 rupees'.");
                   }
@@ -778,6 +896,40 @@ function RuralRetailOS() {
               }
             }}
           />
+          {learningWord && (
+            <div className="mt-3 rounded-md border border-leaf-200 bg-leaf-50 p-4 shadow-sm">
+              <p className="text-sm font-semibold text-leaf-800">
+                I encountered an unknown word/phrase: <span className="font-black text-leaf-900">"{learningWord}"</span>.
+              </p>
+              <p className="text-xs text-ink/75 font-semibold mt-1">Teach GramMart AI: is this an alias for one of these?</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {products.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => learnAlias("PRODUCT", p.id, learningWord)}
+                    className="rounded bg-white px-2 py-1 text-xs font-black text-leaf-700 border border-leaf-100 hover:border-leaf-600 transition"
+                  >
+                    Alias for {p.name}
+                  </button>
+                ))}
+                {customers.slice(0, 3).map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => learnAlias("CUSTOMER", c.name, learningWord)}
+                    className="rounded bg-white px-2 py-1 text-xs font-black text-leaf-700 border border-leaf-100 hover:border-leaf-600 transition"
+                  >
+                    Alias for {c.name}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setLearningWord("")}
+                  className="rounded bg-leaf-200 px-2 py-1 text-xs font-black text-leaf-700 hover:bg-leaf-300 transition"
+                >
+                  Ignore
+                </button>
+              </div>
+            </div>
+          )}
         </aside>
       </section>
 

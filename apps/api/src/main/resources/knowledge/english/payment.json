@@ -1,0 +1,4 @@
+{
+  "currencies": ["rs", "rupees", "rupee", "₹", "bucks", "cash"],
+  "paymentVerbs": ["paid", "receive", "payment", "received", "settle", "give"]
+}

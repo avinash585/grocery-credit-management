@@ -1,0 +1,15 @@
+{
+  "OPEN_CUSTOMER": ["തുറക്കുക", "ഓപ്പൺ", "അക്കൗണ്ട് തുറക്കുക", "open", "kholo"],
+  "ADD_PURCHASE": ["ചേർക്കുക", "കൂട്ടുക", "കടം എഴുതുക", "add", "jodo"],
+  "REMOVE_ITEM": ["ഒഴിവാക്കുക", "വേണ്ട", "മാറ്റുക", "raddhu", "remove", "undo"],
+  "RECEIVE_PAYMENT": ["പേയ്മെന്റ്", "വാങ്ങുക", "ലഭിച്ചു", "paid", "receive"],
+  "SEARCH_PRODUCT": ["തിരയുക", "തിരഞ്ഞുനോക്കുക", "search", "find"],
+  "GENERATE_BILL": ["ബില്ല്", "സേവ് ചെയ്യുക", "സ്ഥിരീകരിക്കുക", "confirm", "bill"],
+  "SEND_SMS": ["ഓർമ്മപ്പെടുത്തൽ", "അയക്കുക", "sms", "reminder"],
+  "SEND_WHATSAPP": ["വാട്സാപ്പ്", "whatsapp", "ping"],
+  "SHOW_LEDGER": ["കണക്കു പുസ്തകം", "ലെഡ്ജർ", "ledger"],
+  "SHOW_REPORT": ["റിപ്പോർട്ട്", "ആകെ വിൽപന", "report"],
+  "SHOW_OUTSTANDING": ["ബാക്കി", "കുടിശ്ശിക", "outstanding"],
+  "CREATE_CUSTOMER": ["പുതിയ ഉപഭോക്താവ്", "create customer"],
+  "CREATE_FAMILY": ["കുടുംബം", "create family"]
+}

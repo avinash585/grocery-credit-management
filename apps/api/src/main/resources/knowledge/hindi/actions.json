@@ -1,0 +1,15 @@
+{
+  "OPEN_CUSTOMER": ["खोल", "खाता खोल", "खोलना", "kholo", "open"],
+  "ADD_PURCHASE": ["जोड़", "लिखो", "डाल", "लगा", "add", "jodo"],
+  "REMOVE_ITEM": ["हटाओ", "काटो", "मना", "remove", "undo", "raddhu"],
+  "RECEIVE_PAYMENT": ["मिला", "पेमेंट", "जमा", "वसूल", "paid", "receive", "bhugtan"],
+  "SEARCH_PRODUCT": ["ढूंढो", "खोजो", "search", "find"],
+  "GENERATE_BILL": ["बिल बनाओ", "सेव करो", "confirm", "bill"],
+  "SEND_SMS": ["याद दिलाओ", "भेजो", "sms", "reminder"],
+  "SEND_WHATSAPP": ["व्हाट्सएप", "whatsapp", "ping"],
+  "SHOW_LEDGER": ["बहीखाता", "खाता", "ledger"],
+  "SHOW_REPORT": ["रिपोर्ट", "summary", "report"],
+  "SHOW_OUTSTANDING": ["बकाया", "उधार", "outstanding"],
+  "CREATE_CUSTOMER": ["नया ग्राहक", "create customer"],
+  "CREATE_FAMILY": ["परिवार", "create family"]
+}

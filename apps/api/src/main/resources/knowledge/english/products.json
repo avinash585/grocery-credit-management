@@ -1,0 +1,6 @@
+[
+  { "id": "RICE", "nameEn": "Rice", "nameLocal": "Rice", "aliases": ["rice", "sona masoori", "basmati", "white rice"] },
+  { "id": "SUGAR", "nameEn": "Sugar", "nameLocal": "Sugar", "aliases": ["sugar", "white sugar", "brown sugar"] },
+  { "id": "OIL", "nameEn": "Sunflower Oil", "nameLocal": "Sunflower Oil", "aliases": ["oil", "sunflower oil", "coconut oil", "cooking oil"] },
+  { "id": "DAL", "nameEn": "Toor Dal", "nameLocal": "Toor Dal", "aliases": ["dal", "toor dal", "lentils", "pulses"] }
+]

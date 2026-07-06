@@ -199,7 +199,7 @@ export async function parseVoiceCommand(transcript: string, language: Language) 
     return null;
   }
 
-  const response = await fetch(`${API_BASE_URL}/voice/commands`, {
+  const response = await fetch(`${API_BASE_URL}/voice/normalize`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
     body: JSON.stringify(payload)
@@ -216,7 +216,25 @@ export async function parseVoiceCommand(transcript: string, language: Language) 
     productAlias?: string;
     amount?: string;
     quantity?: string;
+    slots?: {
+      confidence?: number;
+      detectedLanguage?: string;
+      normalizedText?: string;
+      raw?: string;
+    };
   }>;
+}
+
+export async function learnVoiceAlias(category: "CUSTOMER" | "PRODUCT", canonicalId: string, aliasValue: string) {
+  const response = await fetch(`${API_BASE_URL}/voice/learn`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    body: JSON.stringify({ category, canonicalId, aliasValue, shopId: "demo-shop" })
+  });
+  if (!response.ok) {
+    throw new Error("Failed to teach alias");
+  }
+  return response.json();
 }
 
 export function pushOfflineSync(operations: Array<{ clientOperationId: string; type: string; payload: string }>) {

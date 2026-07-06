@@ -1,0 +1,3 @@
+{
+  "suffixesToStrip": ["'s", "s", "the", "for", "to", "of", "in", "on"]
+}

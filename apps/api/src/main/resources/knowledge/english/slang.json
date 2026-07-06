@@ -1,0 +1,7 @@
+{
+  "ledger": "account",
+  "money": "amount",
+  "stuff": "products",
+  "card": "bill",
+  "sms": "reminder"
+}

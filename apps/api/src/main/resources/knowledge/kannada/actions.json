@@ -1,0 +1,15 @@
+{
+  "OPEN_CUSTOMER": ["ತೆರೆ", "ಓಪನ್", "ಖಾತೆ ತೆರೆಯಿರಿ", "open", "kholo"],
+  "ADD_PURCHASE": ["ಸೇರಿಸು", "ಹಾಕು", "ಬರೆ", "add", "jodo"],
+  "REMOVE_ITEM": ["ತೆಗೆದುಹಾಕು", "ಬೇಡ", "ತೆಗೆ", "raddhu", "remove", "undo"],
+  "RECEIVE_PAYMENT": ["ಪಡೆ", "ಖಾತೆ ಜಮಾ", "ಪಾವತಿ", "paid", "receive"],
+  "SEARCH_PRODUCT": ["ಹುಡುಕು", "ಚೆಕ್ ಮಾಡು", "search", "find"],
+  "GENERATE_BILL": ["ಬಿಲ್ಲು", "ಉಳಿಸು", "ಖಚಿತಪಡಿಸು", "confirm", "bill"],
+  "SEND_SMS": ["ನೆನಪಿಸು", "ಕಳುಹಿಸು", "sms", "reminder"],
+  "SEND_WHATSAPP": ["ವಾಟ್ಸಾಪ್", "whatsapp", "ping"],
+  "SHOW_LEDGER": ["ಖಾತೆ ಪುಸ್ತಕ", "ಲೆಡ್ಜರ್", "ledger"],
+  "SHOW_REPORT": ["ವರದಿ", "ರಿಪೋರ್ಟ್", "report"],
+  "SHOW_OUTSTANDING": ["ಬಾಕಿ", "ಉದ್ದರಿ", "outstanding"],
+  "CREATE_CUSTOMER": ["ಹೊಸ ಗ್ರಾಹಕ", "create customer"],
+  "CREATE_FAMILY": ["ಕುಟುಂಬ", "create family"]
+}

@@ -1,0 +1,6 @@
+[
+  { "id": "RICE", "nameEn": "Rice", "nameLocal": "चावल", "aliases": ["चावल", "सोना मसूरी", "chawal", "rice"] },
+  { "id": "SUGAR", "nameEn": "Sugar", "nameLocal": "चीनी", "aliases": ["चीनी", "शक्कर", "chini", "sugar"] },
+  { "id": "OIL", "nameEn": "Sunflower Oil", "nameLocal": "तेल", "aliases": ["तेल", "सरसों का तेल", "oil"] },
+  { "id": "DAL", "nameEn": "Toor Dal", "nameLocal": "दाल", "aliases": ["दाल", "अरहर दाल", "dal"] }
+]

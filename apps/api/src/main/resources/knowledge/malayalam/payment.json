@@ -1,0 +1,4 @@
+{
+  "currencies": ["രൂപ", "റുപ്പിക", "rs", "rupees", "rupee", "₹"],
+  "paymentVerbs": ["ലഭിച്ചു", "വാങ്ങി", "തന്നു", "paid", "receive"]
+}

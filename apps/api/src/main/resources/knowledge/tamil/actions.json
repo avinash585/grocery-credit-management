@@ -1,0 +1,15 @@
+{
+  "OPEN_CUSTOMER": ["திற", "கணக்கை திற", "திறக்கவும்", "கணக்கு", "open", "kholo"],
+  "ADD_PURCHASE": ["போடு", "சேர்", "சேர்க்கவும்", "கடன் போடு", "வச்சிடு", "kootu", "add", "ser"],
+  "REMOVE_ITEM": ["நீக்கு", "அழி", "வேண்டாம்", "தவிர்", "remove", "undo"],
+  "RECEIVE_PAYMENT": ["பெறு", "பணம்", "வாங்கவும்", "கட்டணம்", "வசூல்", "paid", "receive"],
+  "SEARCH_PRODUCT": ["தேடு", "பொருள் தேடு", "search", "find"],
+  "GENERATE_BILL": ["பில் போடு", "சேமி", "சரி", "பில்", "confirm", "bill"],
+  "SEND_SMS": ["நினைவூட்டல்", "மெசேஜ்", "அனுப்பு", "reminder", "sms"],
+  "SEND_WHATSAPP": ["வாட்ஸ்அப்", "whatsapp", "ping"],
+  "SHOW_LEDGER": ["பேரேடு", "வரவு செலவு", "ledger"],
+  "SHOW_REPORT": ["அறிக்கை", "விற்பனை அறிக்கை", "report"],
+  "SHOW_OUTSTANDING": ["நிலுவை", "கடன் நிலுவை", "outstanding"],
+  "CREATE_CUSTOMER": ["புதிய வாடிக்கையாளர்", "create customer"],
+  "CREATE_FAMILY": ["குடும்பம்", "குடும்ப குழு", "create family"]
+}
