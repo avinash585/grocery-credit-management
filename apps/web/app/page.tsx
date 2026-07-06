@@ -1364,24 +1364,33 @@ function VoiceCard({
       />
 
       {transcript && transcript.trim() !== "Listening..." && transcript.trim() !== "Speech recognition is not available in this browser." && (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="mt-3 space-y-2">
           <button
             type="button"
             onClick={onRunCommand}
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-leaf-600 px-4 font-black text-white hover:bg-leaf-700 transition text-base"
           >
             <CheckCircle className="h-4 w-4" aria-hidden />
-            Run Command
+            Submit Voice Response
           </button>
           
-          <button
-            type="button"
-            onClick={onSendToAi}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-white/15 px-4 font-black text-white hover:bg-white/25 transition text-base border border-white/10"
-          >
-            <Sparkles className="h-4 w-4" aria-hidden />
-            Ask AI Assistant
-          </button>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={onSendToAi}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-white/10 px-4 font-bold text-white hover:bg-white/20 transition text-sm border border-white/5"
+            >
+              <Sparkles className="h-4 w-4" aria-hidden />
+              Ask AI Assistant
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeTranscript("")}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-white/10 px-4 font-bold text-white hover:bg-white/20 hover:text-chilli transition text-sm border border-white/5"
+            >
+              Clear Text
+            </button>
+          </div>
         </div>
       )}
     </div>
