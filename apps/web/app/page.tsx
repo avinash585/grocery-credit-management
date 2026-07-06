@@ -3,20 +3,21 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
-  BarChart3,
+  ArrowLeft,
   Bot,
+  Circle2,
+  CircleCheck,
+  CheckCircle,
+  Coins,
   CreditCard,
-  LayoutDashboard,
-  IndianRupee,
   Languages,
-  MessageCircle,
+  LayoutDashboard,
+  LogOut,
   Mic,
-  PackageSearch,
   Plus,
+  QrCode,
   ReceiptText,
   Search,
-  Settings,
-  ShieldCheck,
   Sparkles,
   Store,
   Volume2,
@@ -39,7 +40,8 @@ import {
   receivePayment,
   registerShop,
   searchCustomers,
-  searchProducts
+  searchProducts,
+  parseVoiceCommand
 } from "@/lib/api";
 import { Language, t } from "@/lib/i18n";
 import { readQueue, useNetworkStatus, syncOfflineQueue } from "@/lib/offline";
@@ -738,14 +740,37 @@ function RuralRetailOS() {
             aiQueryOverride={aiQueryOverride}
             setAiQueryOverride={setAiQueryOverride}
           />
-          <VoiceCard transcript={transcript} copy={copy} onSendToAi={() => {
-            if (transcript) {
-              setAiQueryOverride(transcript);
-              setView("ai");
-              setActiveTask("ai");
-              setStatus(`Sending voice question to AI: "${transcript}"`);
-            }
-          }} />
+          <VoiceCard
+            transcript={transcript}
+            onChangeTranscript={setTranscript}
+            copy={copy}
+            onSendToAi={() => {
+              if (transcript.trim()) {
+                setAiQueryOverride(transcript.trim());
+                setView("ai");
+                setActiveTask("ai");
+                setStatus(`Sending question to AI: "${transcript.trim()}"`);
+              }
+            }}
+            onRunCommand={async () => {
+              if (transcript.trim()) {
+                setBusy(true);
+                setStatus("Parsing transaction command...");
+                try {
+                  const cmd = await parseVoiceCommand(transcript.trim(), language);
+                  if (cmd) {
+                    handleVoiceCommand(cmd);
+                  } else {
+                    setStatus("Could not parse command. Try using format like: 'Kumar Stores payment 500 rupees'.");
+                  }
+                } catch (error) {
+                  setStatus("Failed to parse command. Check server connection.");
+                } finally {
+                  setBusy(false);
+                }
+              }
+            }}
+          />
         </aside>
       </section>
 
@@ -1307,7 +1332,19 @@ function localAiAnswer(copy: ReturnType<typeof t>, customer: Customer | null) {
   return copy.suggestedNextStep;
 }
 
-function VoiceCard({ transcript, copy, onSendToAi }: { transcript: string; copy: ReturnType<typeof t>; onSendToAi: () => void }) {
+function VoiceCard({
+  transcript,
+  onChangeTranscript,
+  copy,
+  onSendToAi,
+  onRunCommand
+}: {
+  transcript: string;
+  onChangeTranscript: (val: string) => void;
+  copy: ReturnType<typeof t>;
+  onSendToAi: () => void;
+  onRunCommand: () => void;
+}) {
   return (
     <div id="voice-panel" className="rounded-md bg-ink p-4 text-white shadow-soft">
       <div className="flex items-center gap-3">
@@ -1318,16 +1355,34 @@ function VoiceCard({ transcript, copy, onSendToAi }: { transcript: string; copy:
         </div>
       </div>
       <p className="mt-3 text-white/70">{copy.voicePrompt}</p>
-      <div className="mt-3 min-h-24 rounded-md bg-white/10 p-3 text-lg font-bold">{transcript || copy.waitingForVoice}</div>
-      {transcript && transcript !== "Listening..." && transcript !== "Speech recognition is not available in this browser." && (
-        <button
-          type="button"
-          onClick={onSendToAi}
-          className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-leaf-600 px-4 font-black text-white hover:bg-leaf-700 transition text-base"
-        >
-          <Sparkles className="h-4 w-4" aria-hidden />
-          Send to AI Assistant
-        </button>
+      
+      <textarea
+        value={transcript}
+        onChange={(e) => onChangeTranscript(e.target.value)}
+        placeholder={copy.waitingForVoice}
+        className="mt-3 min-h-24 w-full rounded-md bg-white/10 p-3 text-lg font-bold text-white outline-none border border-white/10 focus:border-leaf-600 focus:bg-white/15 transition resize-none"
+      />
+
+      {transcript && transcript.trim() !== "Listening..." && transcript.trim() !== "Speech recognition is not available in this browser." && (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={onRunCommand}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-leaf-600 px-4 font-black text-white hover:bg-leaf-700 transition text-base"
+          >
+            <CheckCircle className="h-4 w-4" aria-hidden />
+            Run Command
+          </button>
+          
+          <button
+            type="button"
+            onClick={onSendToAi}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-white/15 px-4 font-black text-white hover:bg-white/25 transition text-base border border-white/10"
+          >
+            <Sparkles className="h-4 w-4" aria-hidden />
+            Ask AI Assistant
+          </button>
+        </div>
       )}
     </div>
   );
