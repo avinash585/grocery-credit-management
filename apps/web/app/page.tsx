@@ -49,8 +49,8 @@ type Task = "credit" | "payment" | "products" | "ai";
 type View = "admin" | "customers" | "billing" | "products" | "ai";
 
 const starterCustomers: Customer[] = [
-  { id: "demo-avina", name: "Avinash A", phone: "9876543210", preferredLanguage: "ENGLISH", outstandingBalance: "66.00" },
-  { id: "demo-kumar", name: "Kumar Stores", phone: "9000011111", preferredLanguage: "ENGLISH", outstandingBalance: "420.00" },
+  { id: "demo-avina", name: "Avinash A", phone: "9876543210", preferredLanguage: "ENGLISH", outstandingBalance: "0.00" },
+  { id: "demo-kumar", name: "Kumar Stores", phone: "9000011111", preferredLanguage: "ENGLISH", outstandingBalance: "0.00" },
   { id: "demo-lakshmi", name: "Lakshmi", phone: "9000022222", preferredLanguage: "TAMIL", outstandingBalance: "0.00" }
 ];
 
@@ -84,6 +84,9 @@ function RuralRetailOS() {
   const [activeTask, setActiveTask] = useState<Task>("credit");
   const [voiceQuantity, setVoiceQuantity] = useState("1");
   const [voiceAmount, setVoiceAmount] = useState("");
+  const [todaySalesVal, setTodaySalesVal] = useState(0);
+  const [todayCreditVal, setTodayCreditVal] = useState(0);
+  const [todayPaymentsVal, setTodayPaymentsVal] = useState(0);
   const [pendingVoiceCommand, setPendingVoiceCommand] = useState<{
     intent: string;
     customerName?: string;
@@ -317,6 +320,8 @@ function RuralRetailOS() {
       const qty = Number(quantity);
       const total = Number(product.sellingPrice) * (Number.isFinite(qty) ? qty : 1);
       updateCustomerBalance(total);
+      setTodayCreditVal(prev => prev + total);
+      setTodaySalesVal(prev => prev + total);
       setSelectedProduct(null);
       setVoiceQuantity("1");
       setPendingVoiceCommand(null);
@@ -330,7 +335,10 @@ function RuralRetailOS() {
         creditBill: true,
         items: [{ productId: product.id, quantity }]
       });
-      setStatus(`Credit sale saved: Rs.${bill?.totalAmount ?? "0"}`);
+      const total = Number(bill?.totalAmount ?? "0");
+      setStatus(`Credit sale saved: Rs.${total}`);
+      setTodayCreditVal(prev => prev + total);
+      setTodaySalesVal(prev => prev + total);
       setSelectedProduct(null);
       setVoiceQuantity("1");
       setPendingVoiceCommand(null);
@@ -338,6 +346,8 @@ function RuralRetailOS() {
       const qty = Number(quantity);
       const total = Number(product.sellingPrice) * (Number.isFinite(qty) ? qty : 1);
       updateCustomerBalance(total);
+      setTodayCreditVal(prev => prev + total);
+      setTodaySalesVal(prev => prev + total);
       setSelectedProduct(null);
       setVoiceQuantity("1");
       setPendingVoiceCommand(null);
@@ -366,6 +376,7 @@ function RuralRetailOS() {
     setStatus("Recording payment...");
     if (demoMode) {
       updateCustomerBalance(-Math.max(0, amount));
+      setTodayPaymentsVal(prev => prev + amount);
       setVoiceAmount("");
       setPendingVoiceCommand(null);
       setStatus(`Demo payment recorded: Rs.${amount.toFixed(2)}.`);
@@ -375,10 +386,12 @@ function RuralRetailOS() {
     try {
       const payment = await receivePayment({ customerId: selectedCustomer!.id, amount: String(amount), note: "Counter payment" });
       setStatus(`Payment saved. Balance: Rs.${payment?.outstandingBalance ?? "0"}`);
+      setTodayPaymentsVal(prev => prev + amount);
       setVoiceAmount("");
       setPendingVoiceCommand(null);
     } catch (error) {
       updateCustomerBalance(-Math.max(0, amount));
+      setTodayPaymentsVal(prev => prev + amount);
       setVoiceAmount("");
       setPendingVoiceCommand(null);
       setDemoMode(true);
@@ -603,10 +616,10 @@ function RuralRetailOS() {
       </section>
 
       <section className="mx-auto grid max-w-7xl gap-5 px-4 py-5 md:grid-cols-4">
-        <SummaryTile icon={IndianRupee} label={copy.todaySales} value="Rs.12,840" tone="bg-leaf-600 text-white" />
-        <SummaryTile icon={CreditCard} label={copy.todayCredit} value="Rs.4,260" tone="bg-[#fff3c7] text-[#644b00]" />
-        <SummaryTile icon={WalletCards} label={copy.todayPayments} value="Rs.7,100" tone="bg-[#e8f1ff] text-[#1f5f9f]" />
-        <SummaryTile icon={UsersRound} label={copy.pendingBalance} value={`Rs.${customers.reduce((sum, customer) => sum + Number(customer.outstandingBalance ?? "0"), 0).toFixed(0)}`} tone="bg-[#ffe9e3] text-chilli" />
+        <SummaryTile icon={IndianRupee} label={copy.todaySales} value={`Rs.${todaySalesVal.toLocaleString()}`} tone="bg-leaf-600 text-white" />
+        <SummaryTile icon={CreditCard} label={copy.todayCredit} value={`Rs.${todayCreditVal.toLocaleString()}`} tone="bg-[#fff3c7] text-[#644b00]" />
+        <SummaryTile icon={WalletCards} label={copy.todayPayments} value={`Rs.${todayPaymentsVal.toLocaleString()}`} tone="bg-[#e8f1ff] text-[#1f5f9f]" />
+        <SummaryTile icon={UsersRound} label={copy.pendingBalance} value={`Rs.${customers.reduce((sum, customer) => sum + Number(customer.outstandingBalance ?? "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} tone="bg-[#ffe9e3] text-chilli" />
       </section>
 
       <section className="mx-auto grid max-w-7xl gap-5 px-4 lg:grid-cols-[0.9fr_1.4fr_0.8fr]">
