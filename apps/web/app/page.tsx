@@ -7,7 +7,6 @@ import {
   Bot,
   Circle2,
   CircleCheck,
-  CheckCircle,
   Coins,
   CreditCard,
   Languages,
@@ -1370,7 +1369,7 @@ function VoiceCard({
             onClick={onRunCommand}
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-leaf-600 px-4 font-black text-white hover:bg-leaf-700 transition text-base"
           >
-            <CheckCircle className="h-4 w-4" aria-hidden />
+            <CircleCheck className="h-4 w-4" aria-hidden />
             Submit Voice Response
           </button>
           
