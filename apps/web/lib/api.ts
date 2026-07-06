@@ -17,6 +17,11 @@ export type Product = {
   sku: string;
   name: string;
   sellingPrice: string;
+  nameTa?: string;
+  nameHi?: string;
+  nameTe?: string;
+  nameKn?: string;
+  nameMl?: string;
 };
 
 export type BillResponse = {

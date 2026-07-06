@@ -60,10 +60,10 @@ const starterCustomers: Customer[] = [
 ];
 
 const starterProducts: Product[] = [
-  { id: "demo-rice", sku: "RICE-001", name: "Sona Masoori Rice", sellingPrice: "58.00" },
-  { id: "demo-sugar", sku: "SUGAR-001", name: "Sugar 1 kg", sellingPrice: "46.00" },
-  { id: "demo-oil", sku: "OIL-001", name: "Sunflower Oil 1 L", sellingPrice: "135.00" },
-  { id: "demo-dal", sku: "DAL-001", name: "Toor Dal 1 kg", sellingPrice: "128.00" }
+  { id: "demo-rice", sku: "RICE-001", name: "Sona Masoori Rice", sellingPrice: "58.00", nameTa: "சோனா மசூரி அரிசி", nameHi: "सोना मसूरी चावल", nameTe: "సోనా మసూరి బియ్యం", nameKn: "ಸೋನಾ ಮಸೂರಿ ಅಕ್ಕಿ", nameMl: "സോന മസൂരി അരി" },
+  { id: "demo-sugar", sku: "SUGAR-001", name: "Sugar 1 kg", sellingPrice: "46.00", nameTa: "சர்க்கரை 1 கிலோ", nameHi: "चीनी 1 किलो", nameTe: "చక్కెర 1 కేజీ", nameKn: "ಸಕ್ಕರೆ 1 ಕೆಜಿ", nameMl: "പഞ്ചസാര 1 കിലോഗ്രാം" },
+  { id: "demo-oil", sku: "OIL-001", name: "Sunflower Oil 1 L", sellingPrice: "135.00", nameTa: "சூரியகாந்தி எண்ணெய் 1 லிட்டர்", nameHi: "सूरजमुखी तेल 1 लीटर", nameTe: "సన్‌ఫ్లవర్ ఆయిల్ 1 లీటర్", nameKn: "ಸೂರ್ಯಕಾಂತಿ ಎಣ್ಣೆ 1 ಲೀಟರ್", nameMl: "സൺഫ്ലവർ ഓയിൽ 1 ലിറ്റർ" },
+  { id: "demo-dal", sku: "DAL-001", name: "Toor Dal 1 kg", sellingPrice: "128.00", nameTa: "துவரம் பருப்பு 1 கிலோ", nameHi: "अरहर दाल 1 किलो", nameTe: "కందిపప్పు 1 కేజీ", nameKn: "తొಗరి బೇಳೆ 1 ಕೆಜಿ", nameMl: "തുവര പരിപ്പ് 1 കിലോഗ്രാം" }
 ];
 
 export default function Home() {
@@ -293,7 +293,9 @@ function RuralRetailOS() {
     setStatus("Searching catalog...");
     const query = String(new FormData(event.currentTarget).get("query") ?? "").toLowerCase();
     if (demoMode) {
-      const result = starterProducts.filter((product) => `${product.name} ${product.sku}`.toLowerCase().includes(query));
+      const result = starterProducts.filter((product) =>
+        `${product.name} ${product.nameTa || ""} ${product.nameHi || ""} ${product.nameTe || ""} ${product.nameKn || ""} ${product.nameMl || ""} ${product.sku}`.toLowerCase().includes(query)
+      );
       setProducts(result.length ? result : starterProducts);
       setActiveTask("products");
       setStatus(result.length ? `${result.length} demo product(s) found.` : "Showing all demo products.");
@@ -307,7 +309,9 @@ function RuralRetailOS() {
       setStatus(result.length ? "Tap a product to add it to this account." : "No product found.");
     } catch (error) {
       const query = String(new FormData(event.currentTarget).get("query") ?? "").toLowerCase();
-      const result = starterProducts.filter((product) => `${product.name} ${product.sku}`.toLowerCase().includes(query));
+      const result = starterProducts.filter((product) =>
+        `${product.name} ${product.nameTa || ""} ${product.nameHi || ""} ${product.nameTe || ""} ${product.nameKn || ""} ${product.nameMl || ""} ${product.sku}`.toLowerCase().includes(query)
+      );
       setProducts(result.length ? result : starterProducts);
       setDemoMode(true);
       setActiveTask("products");
@@ -698,7 +702,7 @@ function RuralRetailOS() {
               if (selectedCustomer) {
                 setView("billing");
               }
-              setStatus(`${product.name} selected for ${selectedCustomer?.name ?? "customer"}.`);
+              setStatus(`${getProductName(product, language)} selected for ${selectedCustomer?.name ?? "customer"}.`);
             }}
             onCreditSubmit={submitCreditBill}
             onPaymentSubmit={submitPayment}
@@ -826,7 +830,7 @@ function CustomerWorkspace(props: {
       ) : view === "customers" ? (
         <CustomerDirectory customers={customers} onOpenCustomer={props.onOpenCustomer} copy={props.copy} />
       ) : view === "products" ? (
-        <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} />
+        <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} />
       ) : view === "ai" && !customer ? (
         <AdminInsights customers={customers} products={props.products} language={props.language} transcript={props.transcript} copy={props.copy} />
       ) : !customer ? (
@@ -873,8 +877,8 @@ function CustomerWorkspace(props: {
           )}
 
           <div className="rounded-md border border-leaf-100 bg-[#fbfcf8] p-4">
-            {activeTask === "products" && <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} />}
-            {activeTask === "credit" && <CreditPanel product={props.selectedProduct} onSubmit={props.onCreditSubmit} onFindProduct={() => { props.onView("products"); onTask("products"); }} busy={props.busy} copy={props.copy} value={props.voiceQuantity} onChange={props.setVoiceQuantity} />}
+            {activeTask === "products" && <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} />}
+            {activeTask === "credit" && <CreditPanel product={props.selectedProduct} onSubmit={props.onCreditSubmit} onFindProduct={() => { props.onView("products"); onTask("products"); }} busy={props.busy} copy={props.copy} value={props.voiceQuantity} onChange={props.setVoiceQuantity} language={props.language} />}
             {activeTask === "payment" && (
               <PaymentPanel
                 onSubmit={props.onPaymentSubmit}
@@ -934,10 +938,10 @@ function AdminPanel({
       </div>
 
       <div className="rounded-md border border-leaf-100 bg-[#fbfcf8] p-4">
-        <h3 className="text-lg font-black text-leaf-900">UPI Payment Settings</h3>
-        <p className="text-sm text-ink/75 font-semibold mt-1">Configure the shop's UPI ID (VPA) to receive credit settlements directly.</p>
+        <h3 className="text-lg font-black text-leaf-900">{copy.upiSettings}</h3>
+        <p className="text-sm text-ink/75 font-semibold mt-1">{copy.upiSettingsHint}</p>
         <div className="mt-3">
-          <label className="block text-xs font-black uppercase tracking-wider text-ink/65">Merchant UPI ID</label>
+          <label className="block text-xs font-black uppercase tracking-wider text-ink/65">{copy.merchantUpiIdLabel}</label>
           <input
             type="text"
             value={merchantUpiId}
@@ -1002,7 +1006,10 @@ function AdminInsights({
           message: "Analyze the current product catalog and customer listings. Suggest exactly 3 brief, predictive inventory restocking alerts or sales tips for the shopkeeper. Keep each point under 12 words. Make them specific (e.g., 'Stock up on Sunflower Oil, weddings are starting' or 'Restock Sugar, credit sales are high').",
           language,
           customers,
-          products
+          products: products.map(p => ({
+            ...p,
+            name: getProductName(p, language)
+          }))
         });
         if (active && response?.answer) {
           const points = response.answer
@@ -1042,11 +1049,11 @@ function AdminInsights({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-md bg-leaf-50 p-4">
-          <p className="text-sm font-black uppercase tracking-wide text-leaf-700">Total Outstanding Credit</p>
+          <p className="text-sm font-black uppercase tracking-wide text-leaf-700">{copy.totalOutstandingCredit}</p>
           <p className="mt-1 text-3xl font-black">Rs.{totalPending.toFixed(2)}</p>
         </div>
         <div className="rounded-md bg-leaf-50 p-4">
-          <p className="text-sm font-black uppercase tracking-wide text-leaf-700">Highest Pending Balance</p>
+          <p className="text-sm font-black uppercase tracking-wide text-leaf-700">{copy.highestPendingBalance}</p>
           {topCustomer && Number(topCustomer.outstandingBalance) > 0 ? (
             <div>
               <p className="mt-1 text-xl font-black leading-none">{topCustomer.name}</p>
@@ -1061,7 +1068,7 @@ function AdminInsights({
       <div className="rounded-md border-2 border-leaf-600 bg-[#f7fbf2] p-5 shadow-soft">
         <h3 className="flex items-center gap-2 text-xl font-black text-leaf-900">
           <Sparkles className="h-5 w-5 text-leaf-600 animate-pulse" aria-hidden />
-          AI Smart Replenishment Alerts
+          {copy.aiReplenishmentAlerts}
         </h3>
 
         {loading ? (
@@ -1089,7 +1096,7 @@ function AdminInsights({
   );
 }
 
-function ProductSearchPanel({ products, onSearch, onSelect, busy, copy }: { products: Product[]; onSearch: (event: FormEvent<HTMLFormElement>) => void; onSelect: (product: Product) => void; busy: boolean; copy: ReturnType<typeof t> }) {
+function ProductSearchPanel({ products, onSearch, onSelect, busy, copy, language }: { products: Product[]; onSearch: (event: FormEvent<HTMLFormElement>) => void; onSelect: (product: Product) => void; busy: boolean; copy: ReturnType<typeof t>; language: Language }) {
   return (
     <div>
       <h3 className="text-2xl font-black">{copy.productSearch}</h3>
@@ -1101,7 +1108,7 @@ function ProductSearchPanel({ products, onSearch, onSelect, busy, copy }: { prod
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {products.map((product) => (
           <button key={product.id} type="button" onClick={() => onSelect(product)} className="rounded-md border border-leaf-100 bg-white p-3 text-left shadow-sm hover:border-leaf-600">
-            <p className="font-black">{product.name}</p>
+            <p className="font-black">{getProductName(product, language)}</p>
             <p className="text-sm font-bold text-ink/60">Rs.{product.sellingPrice}</p>
           </button>
         ))}
@@ -1110,13 +1117,13 @@ function ProductSearchPanel({ products, onSearch, onSelect, busy, copy }: { prod
   );
 }
 
-function CreditPanel({ product, onSubmit, onFindProduct, busy, copy, value, onChange }: { product: Product | null; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onFindProduct: () => void; busy: boolean; copy: ReturnType<typeof t>; value: string; onChange: (val: string) => void }) {
+function CreditPanel({ product, onSubmit, onFindProduct, busy, copy, value, onChange, language }: { product: Product | null; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onFindProduct: () => void; busy: boolean; copy: ReturnType<typeof t>; value: string; onChange: (val: string) => void; language: Language }) {
   return (
     <div>
       <h3 className="text-2xl font-black">{copy.addPurchase}</h3>
       <div className="mt-3 rounded-md bg-white p-3">
         <p className="text-sm font-bold text-ink/60">{copy.selectedProduct}</p>
-        <p className="text-xl font-black">{product ? product.name : copy.noProductSelected}</p>
+        <p className="text-xl font-black">{product ? getProductName(product, language) : copy.noProductSelected}</p>
         <button type="button" onClick={onFindProduct} className="mt-2 rounded-md bg-leaf-50 px-3 py-2 font-black text-leaf-700">{copy.findProduct}</button>
       </div>
       <form onSubmit={onSubmit} className="mt-3 flex flex-col gap-3 sm:flex-row">
@@ -1273,7 +1280,10 @@ function AIAssistant({
         outstandingBalance: customer?.outstandingBalance,
         transcript,
         customers,
-        products
+        products: products.map(p => ({
+          ...p,
+          name: getProductName(p, language)
+        }))
       });
       const nextAnswer = response?.answer ?? localAiAnswer(copy, customer);
       setAnswer(nextAnswer);
@@ -1333,6 +1343,15 @@ function localAiAnswer(copy: ReturnType<typeof t>, customer: Customer | null) {
     return `${customer.name}: Rs.${customer.outstandingBalance ?? "0"} pending. ${copy.suggestedNextStep}`;
   }
   return copy.suggestedNextStep;
+}
+
+function getProductName(product: Product, language: Language): string {
+  if (language === "TAMIL" && product.nameTa) return product.nameTa;
+  if (language === "HINDI" && product.nameHi) return product.nameHi;
+  if (language === "TELUGU" && product.nameTe) return product.nameTe;
+  if (language === "KANNADA" && product.nameKn) return product.nameKn;
+  if (language === "MALAYALAM" && product.nameMl) return product.nameMl;
+  return product.name;
 }
 
 function VoiceCard({

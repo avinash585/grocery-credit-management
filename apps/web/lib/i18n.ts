@@ -1,4 +1,4 @@
-﻿export type Language = "ENGLISH" | "TAMIL" | "HINDI" | "TELUGU" | "KANNADA" | "MALAYALAM";
+export type Language = "ENGLISH" | "TAMIL" | "HINDI" | "TELUGU" | "KANNADA" | "MALAYALAM";
 
 const english = {
   appName: "GramMart AI",
@@ -98,25 +98,82 @@ const english = {
   openCustomerFirst: "Open or create a customer account first.",
   searchSelectProductFirst: "Search and select a product first.",
   allDemoCustomers: "Showing all demo customer accounts.",
-  allDemoProducts: "Showing all demo products."
+  allDemoProducts: "Showing all demo products.",
+  submitVoiceResponse: "Submit Voice Response",
+  clearText: "Clear Text",
+  runCommand: "Run Command",
+  askAiAssistant: "Ask AI Assistant",
+  totalOutstandingCredit: "Total Outstanding Credit",
+  highestPendingBalance: "Highest Pending Balance",
+  liveStatus: "Live Status",
+  upiSettings: "UPI Payment Settings",
+  merchantUpiIdLabel: "Merchant UPI ID",
+  saveUpiConfig: "Save UPI Config",
+  aiReplenishmentAlerts: "AI Smart Replenishment Alerts",
+  upiSettingsHint: "Configure the shop's UPI ID (VPA) to receive credit settlements directly."
 };
 
 const messages: Record<Language, Partial<typeof english>> = {
   ENGLISH: english,
   TAMIL: {
-    productName: "கிராம கடை OS", online: "ஆன்லைன்", offline: "ஆஃப்லைன்", admin: "நிர்வாகம்", customers: "வாடிக்கையாளர்கள்", billing: "பில்லிங்", products: "பொருட்கள்", ai: "AI", todaySales: "விற்பனை", todayCredit: "கடன்", todayPayments: "பணம்", pendingBalance: "நிலுவை", connectShop: "கடையை இணைக்கவும்", phone: "தொலைபேசி", password: "கடவுச்சொல்", loginRegister: "உள்நுழை / பதிவு", openAdminDemo: "டெமோ நிர்வாகம்", adminAccess: "நிர்வாக அணுகல்", shopControlCenter: "கடை கட்டுப்பாட்டு மையம்", customerDirectory: "வாடிக்கையாளர் பட்டியல்", searchCustomer: "பெயர் அல்லது தொலைபேசி தேடவும்", newCustomerName: "புதிய வாடிக்கையாளர் பெயர்", createAndOpen: "உருவாக்கி திறக்கவும்", customerAccount: "வாடிக்கையாளர் கணக்கு", outstanding: "நிலுவை", addPurchase: "கடன் விற்பனை", receivePayment: "பணம் பெறுதல்", productSearch: "பொருள் தேடு", findProduct: "பொருள் தேடு", selectedProduct: "தேர்ந்தெடுத்த பொருள்", noProductSelected: "பொருள் தேர்வு செய்யப்படவில்லை", quantity: "அளவு", saveCredit: "கடன் சேமி", amountReceived: "பெற்ற தொகை", savePayment: "பணம் சேமி", liveStatus: "நிலை", aiAssistant: "AI உதவியாளர்", askSimpleWords: "எளிய வார்த்தைகளில் கேளுங்கள்", askAssistant: "AI கேள்", voiceFirst: "முதலில் குரல்", voiceAssistant: "குரல் உதவியாளர்", voicePrompt: "உதாரணம்: குமார் கணக்கு திற, 2 கிலோ அரிசி சேர், 500 ரூபாய் பெறு.", waitingForVoice: "மைக் அழுத்தி பேசுங்கள்", startVoice: "குரல் கட்டளை தொடங்கு", stopVoice: "குரல் நிறுத்து", listening: "கேட்கிறது..."
+    productName: "கிராம கடை OS",
+    online: "ஆன்லைன்",
+    offline: "ஆஃப்லைன்",
+    admin: "நிர்வாகம்",
+    customers: "வாடிக்கையாளர்கள்",
+    billing: "பில்லிங்",
+    products: "பொருட்கள்",
+    ai: "AI",
+    todaySales: "விற்பனை",
+    todayCredit: "கடன்",
+    todayPayments: "பணம்",
+    pendingBalance: "நிலுவை",
+    connectShop: "கடையை இணைக்கவும்",
+    phone: "தொலைபேசி",
+    password: "கடவுச்சொல்",
+    loginRegister: "உள்நுழை / பதிவு",
+    openAdminDemo: "டெமோ நிர்வாகம்",
+    adminAccess: "நிர்வாக அணுகல்",
+    shopControlCenter: "கடை கட்டுப்பாட்டு மையம்",
+    customerDirectory: "வாடிக்கையாளர் பட்டியல்",
+    searchCustomer: "பெயர் அல்லது தொலைபேசி தேடவும்",
+    newCustomerName: "புதிய வாடிக்கையாளர் பெயர்",
+    createAndOpen: "உருவாக்கி திறக்கவும்",
+    customerAccount: "வாடிக்கையாளர் கணக்கு",
+    outstanding: "நிலுவை",
+    addPurchase: "கடன் விற்பனை",
+    receivePayment: "பணம் பெறுதல்",
+    productSearch: "பொருள் தேடு",
+    findProduct: "பொருள் தேடு",
+    selectedProduct: "தேர்ந்தெடுத்த பொருள்",
+    noProductSelected: "பொருள் தேர்வு செய்யப்படவில்லை",
+    quantity: "அளவு",
+    saveCredit: "கடன் சேமி",
+    amountReceived: "பெற்ற தொகை",
+    savePayment: "பணம் சேமி",
+    liveStatus: "நிலை",
+    aiAssistant: "AI உதவியாளர்",
+    askSimpleWords: "எளிய வார்த்தைகளில் கேளுங்கள்",
+    askAssistant: "AI கேள்",
+    voiceFirst: "முதலில் குரல்",
+    voiceAssistant: "குரல் உதவியாளர்",
+    voicePrompt: "உதாரணம்: குமார் கணக்கு திற, 2 கிலோ அரிசி சேர், 500 ரூபாய் பெறு.",
+    waitingForVoice: "மைக் அழுத்தி பேசுங்கள்",
+    startVoice: "குரல் கட்டளை தொடங்கு",
+    stopVoice: "குரல் நிறுத்து",
+    listening: "கேட்கிறது..."
   },
   HINDI: {
-    productName: "ग्रामीण रिटेल OS", online: "ऑनलाइन", offline: "ऑफलाइन", admin: "एडमिन", customers: "ग्राहक", billing: "बिलिंग", products: "सामान", ai: "AI", todaySales: "बिक्री", todayCredit: "उधार", todayPayments: "भुगतान", pendingBalance: "बाकी", connectShop: "दुकान जोड़ें", phone: "फोन", password: "पासवर्ड", loginRegister: "लॉगिन / रजिस्टर", openAdminDemo: "डेमो एडमिन खोलें", adminAccess: "एडमिन एक्सेस", shopControlCenter: "दुकान कंट्रोल सेंटर", customerDirectory: "ग्राहक सूची", searchCustomer: "नाम या फोन से ग्राहक खोजें", newCustomerName: "नए ग्राहक का नाम", createAndOpen: "बनाएं और खोलें", customerAccount: "ग्राहक खाता", outstanding: "बाकी", addPurchase: "उधार बिक्री", receivePayment: "भुगतान", productSearch: "सामान खोजें", findProduct: "सामान खोजें", selectedProduct: "चुना हुआ सामान", noProductSelected: "कोई सामान नहीं चुना", quantity: "मात्रा", saveCredit: "उधार सेव करें", amountReceived: "मिली राशि", savePayment: "भुगतान सेव करें", liveStatus: "स्थिति", aiAssistant: "AI सहायक", askSimpleWords: "आसान शब्दों में पूछें", askAssistant: "AI से पूछें", voiceFirst: "पहले आवाज", voiceAssistant: "वॉइस असिस्टेंट", voicePrompt: "उदाहरण: कुमार खाता खोलो, 2 किलो चावल जोड़ो, 500 रुपये लो.", waitingForVoice: "माइक दबाकर बोलें", startVoice: "वॉइस कमांड शुरू करें", stopVoice: "वॉइस रोकें", listening: "सुन रहा है..."
+    productName: "ग्रामीण रिटेल OS", online: "ऑनलाइन", offline: "ऑफलाइन", admin: "एडमिन", customers: "ग्राहक", billing: "बिलिंग", products: "सामान", ai: "AI", todaySales: "बिक्री", todayCredit: "उधार", todayPayments: "भुगतान", pendingBalance: "बाकी", connectShop: "दुकान जोड़ें", phone: "फोन", password: "पासवर्ड", loginRegister: "लॉगिन / रजिस्टर", openAdminDemo: "डेमो एडमिन खोलें", adminAccess: "एडमिन एक्सेस", shopControlCenter: "दुकान कंट्रोल सेंटर", customerDirectory: "ग्राहक सूची", searchCustomer: "नाम या फोन से ग्राहक खोजें", newCustomerName: "नए ग्राहक का नाम", createAndOpen: "बनाएं और खोलें", customerAccount: "ग्राहक खाता", outstanding: "बाकी", addPurchase: "उधार बिक्री", receivePayment: "भुगतान", productSearch: "सामान खोजें", findProduct: "सामान खोजें", selectedProduct: "चुना हुआ सामान", noProductSelected: "कोई सामान नहीं चुना", quantity: "मात्रा", saveCredit: "उधार सेव करें", amountReceived: "मिली राशि", savePayment: "भुगतान सेव करें", liveStatus: "स्थिति", aiAssistant: "AI सहायक", askSimpleWords: "आसान शब्दों में पूछें", askAssistant: "AI से पूछें", voiceFirst: "पहले आवाज", voiceAssistant: "वॉइस असिस्टेंट", voicePrompt: "उदाहरण: कुमार खाता खोलो, 2 किलो चावल जोड़ो, 500 रुपये लो.", waitingForVoice: "माइक दबाकर बोलें", startVoice: "वॉइस कमांड शुरू करें", stopVoice: "वॉइस रोकें", listening: "सुन रहा है...", submitVoiceResponse: "आवाज़ जवाब भेजें", clearText: "टेक्स्ट साफ करें", runCommand: "कमांड चलाएं", askAiAssistant: "AI सहायक से पूछें", totalOutstandingCredit: "कुल बकाया उधार", highestPendingBalance: "सबसे अधिक बकाया राशि", liveStatus: "लाइव स्थिति", upiSettings: "UPI भुगतान सेटिंग्स", merchantUpiIdLabel: "मर्चेंट UPI आईडी", saveUpiConfig: "सेटिंग्स सेव करें"
   },
   TELUGU: {
-    productName: "గ్రామ రిటైల్ OS", online: "ఆన్‌లైన్", offline: "ఆఫ్‌లైన్", admin: "అడ్మిన్", customers: "కస్టమర్లు", billing: "బిల్లింగ్", products: "ఉత్పత్తులు", ai: "AI", todaySales: "అమ్మకాలు", todayCredit: "క్రెడిట్", todayPayments: "చెల్లింపులు", pendingBalance: "బాకీ", connectShop: "షాప్ కనెక్ట్", phone: "ఫోన్", password: "పాస్‌వర్డ్", loginRegister: "లాగిన్ / రిజిస్టర్", openAdminDemo: "డెమో అడ్మిన్", adminAccess: "అడ్మిన్ యాక్సెస్", shopControlCenter: "షాప్ కంట్రోల్ సెంటర్", customerDirectory: "కస్టమర్ డైరెక్టరీ", searchCustomer: "పేరు లేదా ఫోన్‌తో వెతకండి", newCustomerName: "కొత్త కస్టమర్ పేరు", createAndOpen: "సృష్టించి తెరవండి", customerAccount: "కస్టమర్ ఖాతా", outstanding: "బాకీ", addPurchase: "క్రెడిట్ సేల్", receivePayment: "చెల్లింపు", productSearch: "ఉత్పత్తి వెతకండి", findProduct: "ఉత్పత్తి వెతకండి", selectedProduct: "ఎంచుకున్న ఉత్పత్తి", noProductSelected: "ఉత్పత్తి ఎంచుకోలేదు", quantity: "పరిమాణం", saveCredit: "క్రెడిట్ సేవ్", amountReceived: "అందిన మొత్తం", savePayment: "చెల్లింపు సేవ్", liveStatus: "స్థితి", aiAssistant: "AI సహాయకుడు", askSimpleWords: "సులభంగా అడగండి", askAssistant: "AIని అడగండి", voiceFirst: "ముందు వాయిస్", voiceAssistant: "వాయిస్ అసిస్టెంట్", voicePrompt: "ఉదా: కుమార్ ఖాతా తెరువు, 2 కిలో బియ్యం జోడించు, 500 రూపాయలు తీసుకో.", waitingForVoice: "మైక్ నొక్కి మాట్లాడండి", startVoice: "వాయిస్ కమాండ్ ప్రారంభించు", stopVoice: "వాయిస్ ఆపు", listening: "వింటోంది..."
+    productName: "గ్రామ రిటైల్ OS", online: "ఆన్‌లైన్", offline: "ఆఫ్‌లైన్", admin: "అడ్మిన్", customers: "కస్టమర్లు", billing: "బిల్లింగ్", products: "ఉత్పత్తులు", ai: "AI", todaySales: "అమ్మకాలు", todayCredit: "క్రెడిట్", todayPayments: "చెల్లింపులు", pendingBalance: "బాకీ", connectShop: "షాప్ కనెక్ట్", phone: "ఫోన్", password: "పాస్‌వర్డ్", loginRegister: "లాగిన్ / రిజిస్టర్", openAdminDemo: "డెమో అడ్మిన్", adminAccess: "అడ్మిన్ యాక్సెస్", shopControlCenter: "షాప్ కంట్రోల్ సెంటర్", customerDirectory: "కస్టమర్ డైరెక్టరీ", searchCustomer: "పేరు లేదా ఫోన్‌తో వెతకండి", newCustomerName: "కొత్త కస్టమర్ పేరు", createAndOpen: "సృష్టించి తెరవండి", customerAccount: "కస్టమర్ ఖాతా", outstanding: "బాకీ", addPurchase: "క్రెడిట్ సేల్", receivePayment: "చెల్లింపు", productSearch: "ఉత్పత్తి వెతకండి", findProduct: "ఉత్పత్తి వెతకండి", selectedProduct: "ఎంచుకున్న ఉత్పత్తి", noProductSelected: "ఉత్పత్తి ఎంచుకోలేదు", quantity: "పరిమాణం", saveCredit: "క్రెడిట్ సేవ్", amountReceived: "అందిన మొత్తం", savePayment: "చెల్లింపు సేవ్", liveStatus: "స్థితి", aiAssistant: "AI సహాయకుడు", askSimpleWords: "సులభంగా అడగండి", askAssistant: "AIని అడగండి", voiceFirst: "ముందు వాయిస్", voiceAssistant: "వాయిస్ అసిస్టెంట్", voicePrompt: "ఉదా: కుమార్ ఖాతా తెరువు, 2 కిలో బియ్యం జోడించు, 500 రూపాయలు తీసుకో.", waitingForVoice: "మైక్ నొక్కి మాట్లాడండి", startVoice: "వాయిస్ కమాండ్ ప్రారంభించు", stopVoice: "వాయిస్ ఆపు", listening: "వింటోంది...", submitVoiceResponse: "వాయిస్ స్పందనను సమర్పించు", clearText: "టెక్స్ట్ క్లియర్ చేయి", runCommand: "కమాండ్ రన్ చేయి", askAiAssistant: "AI సహాయకుడిని అడుగు", totalOutstandingCredit: "మొత్తం బాకీ క్రెడిట్", highestPendingBalance: "అత్యధిక బాకీ బ్యాలెన్స్", liveStatus: "లైవ్ స్థితి", upiSettings: "UPI పేమెంట్ సెట్టింగ్స్", merchantUpiIdLabel: "మర్చంట్ UPI ఐడీ", saveUpiConfig: "కాన్ఫిగ్ సేవ్ చేయి"
   },
   KANNADA: {
-    productName: "ಗ್ರಾಮ ರಿಟೇಲ್ OS", online: "ಆನ್‌ಲೈನ್", offline: "ಆಫ್‌ಲೈನ್", admin: "ಅಡ್ಮಿನ್", customers: "ಗ್ರಾಹಕರು", billing: "ಬಿಲ್ಲಿಂಗ್", products: "ಉತ್ಪನ್ನಗಳು", ai: "AI", todaySales: "ಮಾರಾಟ", todayCredit: "ಕ್ರೆಡಿಟ್", todayPayments: "ಪಾವತಿಗಳು", pendingBalance: "ಬಾಕಿ", connectShop: "ಅಂಗಡಿ ಸಂಪರ್ಕ", phone: "ಫೋನ್", password: "ಪಾಸ್ವರ್ಡ್", loginRegister: "ಲಾಗಿನ್ / ನೋಂದಣಿ", openAdminDemo: "ಡೆಮೋ ಅಡ್ಮಿನ್", adminAccess: "ಅಡ್ಮಿನ್ ಪ್ರವೇಶ", shopControlCenter: "ಅಂಗಡಿ ನಿಯಂತ್ರಣ ಕೇಂದ್ರ", customerDirectory: "ಗ್ರಾಹಕರ ಪಟ್ಟಿ", searchCustomer: "ಹೆಸರು ಅಥವಾ ಫೋನ್ ಹುಡುಕಿ", newCustomerName: "ಹೊಸ ಗ್ರಾಹಕ ಹೆಸರು", createAndOpen: "ರಚಿಸಿ ತೆರೆಯಿರಿ", customerAccount: "ಗ್ರಾಹಕ ಖಾತೆ", outstanding: "ಬಾಕಿ", addPurchase: "ಕ್ರೆಡಿಟ್ ಮಾರಾಟ", receivePayment: "ಪಾವತಿ", productSearch: "ಉತ್ಪನ್ನ ಹುಡುಕಿ", findProduct: "ಉತ್ಪನ್ನ ಹುಡುಕಿ", selectedProduct: "ಆಯ್ದ ಉತ್ಪನ್ನ", noProductSelected: "ಉತ್ಪನ್ನ ಆಯ್ಕೆಯಾಗಿಲ್ಲ", quantity: "ಪ್ರಮಾಣ", saveCredit: "ಕ್ರೆಡಿಟ್ ಉಳಿಸಿ", amountReceived: "ಸ್ವೀಕರಿಸಿದ ಮೊತ್ತ", savePayment: "ಪಾವತಿ ಉಳಿಸಿ", liveStatus: "ಸ್ಥಿತಿ", aiAssistant: "AI ಸಹಾಯಕ", askSimpleWords: "ಸರಳವಾಗಿ ಕೇಳಿ", askAssistant: "AI ಕೇಳಿ", voiceFirst: "ಮೊದಲು ಧ್ವನಿ", voiceAssistant: "ಧ್ವನಿ ಸಹಾಯಕ", voicePrompt: "ಉದಾ: ಕುಮಾರ್ ಖಾತೆ ತೆರೆಯಿರಿ, 2 ಕೆಜಿ ಅಕ್ಕಿ ಸೇರಿಸಿ, 500 ರೂಪಾಯಿ ಸ್ವೀಕರಿಸಿ.", waitingForVoice: "ಮೈಕ್ ಒತ್ತಿ ಮಾತನಾಡಿ", startVoice: "ಧ್ವನಿ ಆದೇಶ ಪ್ರಾರಂಭಿಸಿ", stopVoice: "ಧ್ವನಿ ನಿಲ್ಲಿಸಿ", listening: "ಕೇಳುತ್ತಿದೆ..."
+    productName: "ಗ್ರಾಮ ರಿಟೇಲ್ OS", online: "ಆನ್‌ಲೈನ್", offline: "ಆಫ್‌ಲೈನ್", admin: "ಅಡ್ಮಿನ್", customers: "ಗ್ರಾಹಕರು", billing: "ಬಿಲ್ಲಿಂಗ್", products: "ಉತ್ಪನ್ನಗಳು", ai: "AI", todaySales: "ಮಾರಾಟ", todayCredit: "ಕ್ರೆಡಿಟ್", todayPayments: "ಪಾವತಿಗಳು", pendingBalance: "ಬಾಕಿ", connectShop: "ಅಂಗಡಿ ಸಂಪರ್ಕ", phone: "ಫೋನ್", password: "ಪಾಸ್ವರ್ಡ್", loginRegister: "ಲಾಗಿನ್ / ನೋಂದಣಿ", openAdminDemo: "ಡೆಮೋ ಅಡ್ಮಿನ್", adminAccess: "ಅಡ್ಮಿನ್ ಪ್ರವೇಶ", shopControlCenter: "ಅಂಗಡಿ ನಿಯಂತ್ರಣ ಕೇಂದ್ರ", customerDirectory: "ಗ್ರಾಹಕರ ಪಟ್ಟಿ", searchCustomer: "ಹೆಸರು ಅಥವಾ ಫೋನ್ ಹುಡುಕಿ", newCustomerName: "ಹೊಸ ಗ್ರಾಹಕ ಹೆಸರು", createAndOpen: "ರಚಿಸಿ ತೆರೆಯಿರಿ", customerAccount: "ಗ್ರಾಹಕ ಖಾತೆ", outstanding: "ಬಾಕಿ", addPurchase: "ಕ್ರೆಡಿಟ್ ಮಾರಾಟ", receivePayment: "ಪಾವತಿ", productSearch: "ಉತ್ಪನ್ನ ಹುಡುಕಿ", findProduct: "ಉತ್ಪನ್ನ ಹುಡುಕಿ", selectedProduct: "ಆಯ್ದ ಉತ್ಪನ್ನ", noProductSelected: "ಉತ್ಪನ್ನ ಆಯ್ಕೆಯಾಗಿಲ್ಲ", quantity: "ಪ್ರಮಾಣ", saveCredit: "ಕ್ರೆಡಿಟ್ ಉಳಿಸಿ", amountReceived: "ಸ್ವೀಕರಿಸಿದ ಮೊತ್ತ", savePayment: "ಪಾವತಿ ಉಳಿಸಿ", liveStatus: "ಸ್ಥಿತಿ", aiAssistant: "AI ಸಹಾಯಕ", askSimpleWords: "ಸರಳವಾಗಿ ಕೇಳಿ", askAssistant: "AI ಕೇಳಿ", voiceFirst: "ಮೊದಲು ಧ್ವನಿ", voiceAssistant: "ಧ್ವನಿ ಸಹಾಯಕ", voicePrompt: "ಉದಾ: ಕುಮಾರ್ ಖಾತೆ ತೆರೆಯಿರಿ, 2 ಕೆಜಿ ಅಕ್ಕಿ ಸೇರಿಸಿ, 500 ರೂಪಾಯಿ ಸ್ವೀಕರಿಸಿ.", waitingForVoice: "ಮೈಕ್ ಒತ್ತಿ ಮಾತನಾಡಿ", startVoice: "ಧ್ವನಿ ಆದೇಶ ಪ್ರಾರಂಭಿಸಿ", stopVoice: "ಧ್ವನಿ ನಿಲ್ಲಿಸಿ", listening: "ಕೇಳುತ್ತಿದೆ...", submitVoiceResponse: "ಧ್ವನಿ ಪ್ರತಿಕ್ರಿಯೆ ಸಲ್ಲಿಸಿ", clearText: "ಪಠ್ಯವನ್ನು ಅಳಿಸಿ", runCommand: "ಆದೇಶವನ್ನು ರನ್ ಮಾಡಿ", askAiAssistant: "AI ಸಹಾಯಕನನ್ನು ಕೇಳಿ", totalOutstandingCredit: "ಒಟ್ಟು ಬಾಕಿ ಕ್ರೆಡಿಟ್", highestPendingBalance: "ಅತಿ ಹೆಚ್ಚು ಬಾಕಿ ಮೊತ್ತ", liveStatus: "ಲೈവ് ಸ್ಥಿತಿ", upiSettings: "UPI ಪಾವತಿ ಸೆಟ್ಟಿಂಗ್‌ಗಳು", merchantUpiIdLabel: "ಮರ್ಚೆಂಟ್ UPI ಐಡಿ", saveUpiConfig: "ಸಂರಚನೆ ಉಳಿಸಿ"
   },
   MALAYALAM: {
-    productName: "ഗ്രാമ റീറ്റെയിൽ OS", online: "ഓൺലൈൻ", offline: "ഓഫ്‌ലൈൻ", admin: "അഡ്മിൻ", customers: "കസ്റ്റമർ", billing: "ബില്ലിംഗ്", products: "ഉൽപ്പന്നങ്ങൾ", ai: "AI", todaySales: "വിൽപ്പന", todayCredit: "കടം", todayPayments: "പേയ്മെന്റ്", pendingBalance: "ബാക്കി", connectShop: "കട ബന്ധിപ്പിക്കുക", phone: "ഫോൺ", password: "പാസ്‌വേഡ്", loginRegister: "ലോഗിൻ / രജിസ്റ്റർ", openAdminDemo: "ഡെമോ അഡ്മിൻ", adminAccess: "അഡ്മിൻ ആക്‌സസ്", shopControlCenter: "കട നിയന്ത്രണ കേന്ദ്രം", customerDirectory: "കസ്റ്റമർ പട്ടിക", searchCustomer: "പേര് അല്ലെങ്കിൽ ഫോൺ തേടുക", newCustomerName: "പുതിയ കസ്റ്റമർ പേര്", createAndOpen: "സൃഷ്ടിച്ച് തുറക്കുക", customerAccount: "കസ്റ്റമർ അക്കൗണ്ട്", outstanding: "ബാക്കി", addPurchase: "കടം വിൽപ്പന", receivePayment: "പേയ്മെന്റ്", productSearch: "ഉൽപ്പന്നം തേടുക", findProduct: "ഉൽപ്പന്നം തേടുക", selectedProduct: "തിരഞ്ഞെടുത്ത ഉൽപ്പന്നം", noProductSelected: "ഉൽപ്പന്നം തിരഞ്ഞെടുത്തിട്ടില്ല", quantity: "അളവ്", saveCredit: "കടം സേവ്", amountReceived: "ലഭിച്ച തുക", savePayment: "പേയ്മെന്റ് സേവ്", liveStatus: "സ്ഥിതി", aiAssistant: "AI സഹായി", askSimpleWords: "ലളിതമായി ചോദിക്കുക", askAssistant: "AI ചോദിക്കുക", voiceFirst: "ആദ്യം ശബ്ദം", voiceAssistant: "വോയ്സ് അസിസ്റ്റന്റ്", voicePrompt: "ഉദാ: കുമാർ അക്കൗണ്ട് തുറക്കുക, 2 കിലോ അരി ചേർക്കുക, 500 രൂപ വാങ്ങുക.", waitingForVoice: "മൈക്ക് അമർത്തി സംസാരിക്കുക", startVoice: "വോയ്സ് കമാൻഡ് തുടങ്ങുക", stopVoice: "വോയ്സ് നിർത്തുക", listening: "കേൾക്കുന്നു..."
+    productName: "ഗ്രാമ റീറ്റെയിൽ OS", online: "ഓൺ‌ലൈൻ", offline: "ഓഫ്‌ലൈൻ", admin: "അഡ്മിൻ", customers: "കസ്റ്റമർ", billing: "ബില്ലിംഗ്", products: "ഉൽപ്പന്നങ്ങൾ", ai: "AI", todaySales: "വിൽപ്പന", todayCredit: "കടം", todayPayments: "പേയ്മെന്റ്", pendingBalance: "ബാക്കി", connectShop: "കട ബന്ധിപ്പിക്കുക", phone: "ഫോൺ", password: "പാസ്‌വേഡ്", loginRegister: "ലോഗിൻ / രജിസ്റ്റർ", openAdminDemo: "ഡെമോ അഡ്മിൻ", adminAccess: "അഡ്മിൻ ആക്സസ്", shopControlCenter: "കട നിയന്ത്രണ കേന്ദ്രം", customerDirectory: "കസ്റ്റമർ പട്ടിക", searchCustomer: "പേര് അല്ലെങ്കിൽ ഫോൺ തേടുക", newCustomerName: "പുതിയ കസ്റ്റമർ പേര്", createAndOpen: "സൃഷ്ടിച്ച് തുറക്കുക", customerAccount: "കസ്റ്റമർ അക്കൗണ്ട്", outstanding: "ബാക്കി", addPurchase: "കടം വിൽപ്പന", receivePayment: "പേയ്മെന്റ്", productSearch: "ഉൽപ്പന്നം തേടുക", findProduct: "ഉൽപ്പന്നം തേടുക", selectedProduct: "തിരഞ്ഞെടുത്ത ഉൽപ്പന്നം", noProductSelected: "ഉൽപ്പന്നം തിരഞ്ഞെടുത്തിട്ടില്ല", quantity: "അളവ്", saveCredit: "കടം സേവ്", amountReceived: "ലഭിച്ച തുക", savePayment: "പേയ്മെന്റ് സേവ്", liveStatus: "സ്ഥിതി", aiAssistant: "AI സഹായി", askSimpleWords: "ലളിതമായി ചോദിക്കുക", askAssistant: "AI ചോദിക്കുക", voiceFirst: "ആദ്യം ശബ്ദം", voiceAssistant: "വോയ്സ് അസിസ്റ്റന്റ്", voicePrompt: "ഉദാ: കുമാർ അക്കൗണ്ട് തുറക്കുക, 2 കിലോ അരി ചേർക്കുക, 500 രൂപ വാങ്ങുക.", waitingForVoice: "മൈക്ക് അമർത്തി സംസാരിക്കുക", startVoice: "വോയ്സ് കമാൻഡ് തുടങ്ങുക", stopVoice: "വോയ്സ് നിർത്തുക", listening: "കേൾക്കുന്നു...", submitVoiceResponse: "വോയ്‌സ് പ്രതികരണം സമർപ്പിക്കുക", clearText: "ടെക്സ്റ്റ് മായ്ക്കുക", runCommand: "കമാൻഡ് പ്രവർത്തിപ്പിക്കുക", askAiAssistant: "AI സഹായിയോട് ചോദിക്കുക", totalOutstandingCredit: "ആകെ കുടിശ്ശിക കടം", highestPendingBalance: "ഏറ്റവും ഉയർന്ന ബാക്കി തുക", liveStatus: "തത്സമയ നില", upiSettings: "UPI പേയ്‌മെന്റ് ക്രമീകരണങ്ങൾ", merchantUpiIdLabel: "മർച്ചന്റ് UPI ഐഡി", saveUpiConfig: "ക്രമീകരണം സേവ് ചെയ്യുക"
   }
 };
 
@@ -170,7 +227,19 @@ const tamilComplete: Partial<typeof english> = {
   openCustomerFirst: "முதலில் வாடிக்கையாளர் கணக்கை திறக்கவும்.",
   searchSelectProductFirst: "முதலில் பொருளை தேடி தேர்வு செய்யவும்.",
   allDemoCustomers: "அனைத்து டெமோ வாடிக்கையாளர் கணக்குகளும் காட்டப்படுகின்றன.",
-  allDemoProducts: "அனைத்து டெமோ பொருட்களும் காட்டப்படுகின்றன."
+  allDemoProducts: "அனைத்து டெμο பொருட்களும் காட்டப்படுகின்றன.",
+  submitVoiceResponse: "குரல் பதிலை சமர்ப்பி",
+  clearText: "உரையை அழி",
+  runCommand: "கட்டளையை இயக்கு",
+  askAiAssistant: "AI உதவியாளரிடம் கேள்",
+  totalOutstandingCredit: "மொத்த நிலுவை கடன்",
+  highestPendingBalance: "அதிகபட்ச நிலுவை தொகை",
+  liveStatus: "நேரடி நிலை",
+  upiSettings: "UPI கட்டண அமைப்புகள்",
+  merchantUpiIdLabel: "வணிகர் UPI முகவரி",
+  saveUpiConfig: "அமைப்பை சேமி",
+  aiReplenishmentAlerts: "AI ஸ்மார்ட் மறுதொகுதி விழிப்பூட்டல்கள்",
+  upiSettingsHint: "கடன் தொகையை நேரடியாகப் பெற கடையின் UPI ஐடியை உள்ளமைக்கவும்."
 };
 
 export function t(language: Language) {
