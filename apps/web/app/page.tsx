@@ -336,6 +336,7 @@ function RuralRetailOS() {
         items: [{ productId: product.id, quantity }]
       });
       const total = Number(bill?.totalAmount ?? "0");
+      updateCustomerBalance(total);
       setStatus(`Credit sale saved: Rs.${total}`);
       setTodayCreditVal(prev => prev + total);
       setTodaySalesVal(prev => prev + total);
@@ -385,7 +386,18 @@ function RuralRetailOS() {
     }
     try {
       const payment = await receivePayment({ customerId: selectedCustomer!.id, amount: String(amount), note: "Counter payment" });
-      setStatus(`Payment saved. Balance: Rs.${payment?.outstandingBalance ?? "0"}`);
+      if (payment) {
+        setSelectedCustomer((current) => {
+          if (!current || current.id !== payment.customerId) return current;
+          const updated = { ...current, outstandingBalance: payment.outstandingBalance };
+          setCustomers((existing) => existing.map((c) => c.id === updated.id ? updated : c));
+          return updated;
+        });
+        setStatus(`Payment saved. Balance: Rs.${payment.outstandingBalance}`);
+      } else {
+        updateCustomerBalance(-Math.max(0, amount));
+        setStatus(`Payment saved and queued. Dues reduced by: Rs.${amount.toFixed(2)}.`);
+      }
       setTodayPaymentsVal(prev => prev + amount);
       setVoiceAmount("");
       setPendingVoiceCommand(null);
