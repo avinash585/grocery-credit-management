@@ -16,7 +16,7 @@ public class VoiceCommandController {
 
     @PostMapping("/commands")
     VoiceCommandResponse parse(@Valid @RequestBody VoiceCommandRequest request) {
-        return voiceCommandService.parse(request.transcript());
+        return voiceCommandService.parse(request.transcript(), request.language());
     }
 }
 

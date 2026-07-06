@@ -1,18 +1,138 @@
 package com.grammart.voice;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.grammart.common.Language;
 import com.grammart.voice.VoiceDtos.VoiceCommandResponse;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 @Service
 public class VoiceCommandService {
     private static final Pattern MONEY = Pattern.compile("(?:rs\\.?|rupees?|₹)?\\s*(\\d+(?:\\.\\d{1,2})?)", Pattern.CASE_INSENSITIVE);
 
+    private final String geminiApiKey;
+    private final String geminiModel;
+    private final RestClient restClient;
+
+    public VoiceCommandService() {
+        this.restClient = RestClient.builder().baseUrl("https://generativelanguage.googleapis.com").build();
+        this.geminiApiKey = "";
+        this.geminiModel = "gemini-1.5-flash";
+    }
+
+    public VoiceCommandService(
+            RestClient.Builder restClientBuilder,
+            @Value("${app.ai.gemini-api-key:}") String geminiApiKey,
+            @Value("${app.ai.gemini-model:gemini-1.5-flash}") String geminiModel
+    ) {
+        this.restClient = restClientBuilder.baseUrl("https://generativelanguage.googleapis.com").build();
+        this.geminiApiKey = geminiApiKey;
+        this.geminiModel = geminiModel;
+    }
+
     public VoiceCommandResponse parse(String transcript) {
+        return parse(transcript, Language.ENGLISH);
+    }
+
+    public VoiceCommandResponse parse(String transcript, Language language) {
+        if (geminiApiKey == null || geminiApiKey.isBlank()) {
+            return localParse(transcript);
+        }
+
+        try {
+            String prompt = String.format("""
+                    You are an expert NLP parser for an Indian kirana/grocery credit book app.
+                    Analyze the following voice command transcript spoken by a shopkeeper.
+                    Transcript: "%s"
+                    Selected language context: %s
+
+                    Identify the user intent. Supported intents:
+                    - OPEN_CUSTOMER: Open/view a customer's account/details (e.g. "open Kumar Stores", "கணக்கை திற குமார்")
+                    - ASK_BALANCE: Find out how much a customer owes (e.g. "Kumar stores owes how much?", "குமார் எவ்வளவு நிலுவை வைத்துள்ளார்?")
+                    - RECEIVE_PAYMENT: Settle balance/receive money from a customer (e.g. "Kumar Stores paid 500 rupees", "குமார் கணக்கு 500 ரூபாய் பணம் பெற்றேன்")
+                    - ADD_PURCHASE: Record a new credit sale purchase (e.g. "Add 2 kg sugar for Kumar Stores", "குமார் கணக்கில் 500 ரூபாய் சர்க்கரை கடன் சேர்")
+                    - SEND_REMINDER: Send a payment reminder to a customer (e.g. "send sms to Kumar", "நினைவூட்டல் அனுப்பு குமார்")
+                    - SHOW_REPORT: View today sales report (e.g. "show today report", "இன்று விற்பனை அறிக்கை காட்டு")
+                    - UNDO: Revert last action/delete last item (e.g. "undo last", "தவறு")
+                    - CANCEL: Cancel current billing/transaction (e.g. "cancel", "வேண்டாம்")
+                    - CONFIRM: Confirm payment or save credit bill (e.g. "confirm", "சேமி", "சரி")
+
+                    Extract these properties if applicable:
+                    - customerName: The name of the customer mentioned (e.g., "Kumar Stores", "குமார்"). Do not include verbs or stop words.
+                    - productAlias: If recording a purchase, specify the product (choose one: "rice", "sugar", "oil", "dal" or null). Map local terms (e.g. "சர்க்கரை" or "चीनी" -> "sugar", "அரிசி" or "चावल" -> "rice", "எண்ணெய்" or "तेल" -> "oil").
+                    - amount: The monetary value/rupees mentioned in the transcript as a decimal number (e.g., 500.00) or null.
+                    - quantity: The quantity of product mentioned (e.g. "2 kg", "1 liter") or null.
+
+                    Return ONLY a valid JSON object matching this schema:
+                    {
+                      "intent": "OPEN_CUSTOMER" | "ASK_BALANCE" | "RECEIVE_PAYMENT" | "ADD_PURCHASE" | "SEND_REMINDER" | "SHOW_REPORT" | "UNDO" | "CANCEL" | "CONFIRM" | "UNKNOWN",
+                      "customerName": string | null,
+                      "productAlias": string | null,
+                      "amount": number | null,
+                      "quantity": string | null
+                    }
+                    """, transcript, language.name());
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restClient.post()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/v1beta/models/{model}:generateContent")
+                            .queryParam("key", geminiApiKey)
+                            .build(geminiModel))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of(
+                            "contents", List.of(Map.of(
+                                    "role", "user",
+                                    "parts", List.of(Map.of("text", prompt))
+                            )),
+                            "generationConfig", Map.of(
+                                    "temperature", 0.1,
+                                    "maxOutputTokens", 200
+                            )
+                    ))
+                    .retrieve()
+                    .body(Map.class);
+
+            String text = extractText(response);
+            if (text == null || text.isBlank()) {
+                return localParse(transcript);
+            }
+
+            text = text.trim();
+            if (text.startsWith("```")) {
+                text = text.replaceAll("```json", "").replaceAll("```", "").trim();
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+            Map<String, Object> map = mapper.readValue(text, Map.class);
+            String intentStr = (String) map.get("intent");
+            VoiceIntent intent = VoiceIntent.UNKNOWN;
+            try {
+                intent = VoiceIntent.valueOf(intentStr);
+            } catch (Exception e) {}
+            String customerName = (String) map.get("customerName");
+            String productAlias = (String) map.get("productAlias");
+            BigDecimal amount = null;
+            Object amountObj = map.get("amount");
+            if (amountObj != null) {
+                amount = new BigDecimal(amountObj.toString());
+            }
+            String quantity = (String) map.get("quantity");
+            return response(intent, customerName, productAlias, amount, quantity);
+        } catch (Exception e) {
+            return localParse(transcript);
+        }
+    }
+
+    private VoiceCommandResponse localParse(String transcript) {
         String normalized = transcript.toLowerCase(Locale.ROOT).trim();
         if (containsAny(normalized, "undo", "last item remove", "delete last")) {
             return response(VoiceIntent.UNDO, null, null, null, null);
@@ -85,5 +205,25 @@ public class VoiceCommandService {
         candidate = candidate.replaceAll("\\d+(?:\\.\\d+)?", " ").replaceAll("\\s+", " ").trim();
         return candidate.isBlank() ? null : candidate;
     }
-}
 
+    @SuppressWarnings("unchecked")
+    private String extractText(Map<String, Object> response) {
+        if (response == null) {
+            return null;
+        }
+        var candidates = (List<Map<String, Object>>) response.get("candidates");
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+        var content = (Map<String, Object>) candidates.get(0).get("content");
+        if (content == null) {
+            return null;
+        }
+        var parts = (List<Map<String, Object>>) content.get("parts");
+        if (parts == null || parts.isEmpty()) {
+            return null;
+        }
+        Object text = parts.get(0).get("text");
+        return text == null ? null : text.toString();
+    }
+}
