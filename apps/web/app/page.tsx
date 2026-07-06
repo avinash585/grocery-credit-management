@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   BarChart3,
   Bot,
-  Circle2,
   CircleCheck,
   Coins,
   CreditCard,
