@@ -14,5 +14,8 @@ insert into products (
  json_array('oil', 'ennai', 'tel', 'noone', 'enne'), current_timestamp(6), current_timestamp(6)),
 (uuid_to_bin(uuid()), null, 'DAL-TOOR-1KG', 'Pulses', 'Generic', 'kg', 168.00, 0, 1,
  'Toor Dal', 'துவரம் பருப்பு', 'अरहर दाल', 'కందిపప్పు', 'ತೊಗರಿ ಬೇಳೆ', 'തുവര പരിപ്പ്',
- json_array('dal', 'paruppu', 'arhar', 'pappu', 'bele'), current_timestamp(6), current_timestamp(6));
+ json_array('dal', 'paruppu', 'arhar', 'pappu', 'bele'), current_timestamp(6), current_timestamp(6)),
+(uuid_to_bin(uuid()), null, 'MILK-1L', 'Dairy', 'Generic', 'packet', 30.00, 0, 1,
+ 'Milk', 'பால்', 'दूध', 'పాలు', 'ಹಾಲು', 'പാൽ',
+ json_array('milk', 'paal', 'doodh', 'paalu', 'haalu', 'paal'), current_timestamp(6), current_timestamp(6));
 

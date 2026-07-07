@@ -61,6 +61,7 @@ const starterCustomers: Customer[] = [
 ];
 
 const starterProducts: Product[] = [
+  { id: "demo-milk", sku: "MILK-001", name: "Milk 1 Packet", sellingPrice: "30.00", nameTa: "\ubaa\u0bbe\u0bb2\u0bcd\u0020\u0031\u0020\u0baa\u0bbe\u0b95\u0bcd\u0b95\u0bc6\u0b9f\u0bcd", nameHi: "\u0926\u0942\u0927\u0020\u0031\u0020\u092a\u0948\u0915\u0947\u091f", nameTe: "\u0c2a\u0c3e\u0c32\u0c41\u0020\u0031\u0020\u0c2a\u0c4d\u0c2f\u0c3e\u0c15\u0c46\u0c1f\u0c4d", nameKn: "\u0cb9\u0cbe\u0cb2\u0c41\u0020\u0031\u0020\u0caa\u0ccd\u0caf\u0cbe\u0c95\u0cc6\u0c9f\u0ccd", nameMl: "\u0d2a\u0d3e\u0d7d\u0020\u0031\u0020\u0d2a\u0d3e\u0d15\u0d4d\u0d15\u0d31\u0d4d\u0d31\u0d4d" },
   { id: "demo-rice", sku: "RICE-001", name: "Sona Masoori Rice", sellingPrice: "58.00", nameTa: "சோனா மசூரி அரிசி", nameHi: "सोना मसूरी चावल", nameTe: "సోనా మసూరి బియ్యం", nameKn: "ಸೋನಾ ಮಸೂರಿ ಅಕ್ಕಿ", nameMl: "സോന മസൂരി അരി" },
   { id: "demo-sugar", sku: "SUGAR-001", name: "Sugar 1 kg", sellingPrice: "46.00", nameTa: "சர்க்கரை 1 கிலோ", nameHi: "चीनी 1 किलो", nameTe: "చక్కెర 1 కేజీ", nameKn: "ಸಕ್ಕರೆ 1 ಕೆಜಿ", nameMl: "പഞ്ചസാര 1 കിലോഗ്രാം" },
   { id: "demo-oil", sku: "OIL-001", name: "Sunflower Oil 1 L", sellingPrice: "135.00", nameTa: "சூரியகாந்தி எண்ணெய் 1 லிட்டர்", nameHi: "सूरजमुखी तेल 1 लीटर", nameTe: "సన్‌ఫ్లవర్ ఆయిల్ 1 లీటర్", nameKn: "ಸೂರ್ಯಕಾಂತಿ ಎಣ್ಣೆ 1 ಲೀಟರ್", nameMl: "സൺഫ്ലവർ ഓയിൽ 1 ലിറ്റർ" },
@@ -127,6 +128,21 @@ function RuralRetailOS() {
   function clearCart() {
     setCart([]);
     setStatus("Cart cleared.");
+  }
+
+  function handleAddCustomProduct(name: string, price: number) {
+    const newProduct: Product = {
+      id: `custom-${Date.now()}`,
+      sku: `CUSTOM-${Date.now().toString().slice(-6)}`,
+      name,
+      sellingPrice: price.toFixed(2)
+    };
+    setProducts(prev => [newProduct, ...prev]);
+    starterProducts.unshift(newProduct);
+    addToCart(newProduct, "1");
+    setView("billing");
+    setActiveTask("credit");
+    setStatus(`Created custom product "${name}" and added to cart.`);
   }
 
   async function learnAlias(category: "CUSTOMER" | "PRODUCT", canonicalId: string, aliasValue: string) {
@@ -976,6 +992,7 @@ function RuralRetailOS() {
             onAddToCart={addToCart}
             onRemoveFromCart={removeFromCart}
             onClearCart={clearCart}
+            onAddCustomProduct={handleAddCustomProduct}
             language={language}
           />
         </section>
@@ -1136,6 +1153,7 @@ function CustomerWorkspace(props: {
   onAddToCart: (product: Product, quantity: string) => void;
   onRemoveFromCart: (productId: string) => void;
   onClearCart: () => void;
+  onAddCustomProduct: (name: string, price: number) => void;
 }) {
   const { customer, customers, activeTask, onTask, view } = props;
   return (
@@ -1145,7 +1163,7 @@ function CustomerWorkspace(props: {
       ) : view === "customers" ? (
         <CustomerDirectory customers={customers} onOpenCustomer={props.onOpenCustomer} copy={props.copy} />
       ) : view === "products" ? (
-        <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} />
+        <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} onAddCustomProduct={props.onAddCustomProduct} />
       ) : view === "ai" && !customer ? (
         <AdminInsights customers={customers} products={props.products} language={props.language} transcript={props.transcript} copy={props.copy} />
       ) : !customer ? (
@@ -1192,7 +1210,7 @@ function CustomerWorkspace(props: {
           )}
 
           <div className="rounded-md border border-leaf-100 bg-[#fbfcf8] p-4">
-            {activeTask === "products" && <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} />}
+            {activeTask === "products" && <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} onAddCustomProduct={props.onAddCustomProduct} />}
             {activeTask === "credit" && (
               <CreditPanel
                 product={props.selectedProduct}
@@ -1426,7 +1444,27 @@ function AdminInsights({
   );
 }
 
-function ProductSearchPanel({ products, onSearch, onSelect, busy, copy, language }: { products: Product[]; onSearch: (event: FormEvent<HTMLFormElement>) => void; onSelect: (product: Product) => void; busy: boolean; copy: ReturnType<typeof t>; language: Language }) {
+function ProductSearchPanel({
+  products,
+  onSearch,
+  onSelect,
+  busy,
+  copy,
+  language,
+  onAddCustomProduct
+}: {
+  products: Product[];
+  onSearch: (event: FormEvent<HTMLFormElement>) => void;
+  onSelect: (product: Product) => void;
+  busy: boolean;
+  copy: ReturnType<typeof t>;
+  language: Language;
+  onAddCustomProduct: (name: string, price: number) => void;
+}) {
+  const [customName, setCustomName] = useState("");
+  const [customPrice, setCustomPrice] = useState("30.00");
+  const [showAddForm, setShowAddForm] = useState(false);
+
   return (
     <div>
       <h3 className="text-2xl font-black">{copy.productSearch}</h3>
@@ -1435,14 +1473,73 @@ function ProductSearchPanel({ products, onSearch, onSelect, busy, copy, language
         <input name="query" className="ml-2 w-full bg-transparent text-lg font-bold outline-none" placeholder={copy.productSearchPlaceholder} />
         <button disabled={busy} className="rounded-md bg-leaf-600 px-4 py-2 font-black text-white disabled:opacity-60">{copy.search}</button>
       </form>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {products.map((product) => (
-          <button key={product.id} type="button" onClick={() => onSelect(product)} className="rounded-md border border-leaf-100 bg-white p-3 text-left shadow-sm hover:border-leaf-600">
-            <p className="font-black">{getProductName(product, language)}</p>
-            <p className="text-sm font-bold text-ink/60">Rs.{product.sellingPrice}</p>
-          </button>
-        ))}
-      </div>
+
+      {products.length === 0 ? (
+        <div className="mt-4 p-4 rounded-md border border-dashed border-leaf-200 bg-white text-center">
+          <p className="text-sm font-bold text-ink/60">No products found matching your search.</p>
+          {!showAddForm ? (
+            <button
+              type="button"
+              onClick={() => setShowAddForm(true)}
+              className="mt-3 rounded-md bg-leaf-600 px-4 py-2 font-black text-white hover:bg-leaf-700 transition text-sm"
+            >
+              + Add Custom Product
+            </button>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (customName) {
+                  onAddCustomProduct(customName, Number(customPrice || 0));
+                  setShowAddForm(false);
+                  setCustomName("");
+                }
+              }}
+              className="mt-3 grid gap-2 text-left"
+            >
+              <label className="text-xs font-bold text-ink/75">Product Name</label>
+              <input
+                required
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                className="rounded border border-leaf-200 bg-leaf-50 p-2 text-sm font-bold outline-none text-ink"
+                placeholder="e.g. Eggs 1 Dozen"
+              />
+              <label className="text-xs font-bold text-ink/75">Price (Rs.)</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={customPrice}
+                onChange={(e) => setCustomPrice(e.target.value)}
+                className="rounded border border-leaf-200 bg-leaf-50 p-2 text-sm font-bold outline-none text-ink"
+                placeholder="Price"
+              />
+              <div className="flex gap-2 mt-2">
+                <button className="rounded bg-leaf-600 px-4 py-2 text-xs font-black text-white hover:bg-leaf-700 transition">
+                  Create Product
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(false)}
+                  className="rounded bg-leaf-100 px-4 py-2 text-xs font-black text-leaf-700 hover:bg-leaf-200 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      ) : (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {products.map((product) => (
+            <button key={product.id} type="button" onClick={() => onSelect(product)} className="rounded-md border border-leaf-100 bg-white p-3 text-left shadow-sm hover:border-leaf-600">
+              <p className="font-black">{getProductName(product, language)}</p>
+              <p className="text-sm font-bold text-ink/60">Rs.{product.sellingPrice}</p>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
