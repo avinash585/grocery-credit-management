@@ -461,6 +461,84 @@ function RuralRetailOS() {
     });
   }
 
+  function parseLocalCommand(text: string, lang: Language) {
+    const normalized = text.toLowerCase().trim().replace(/[.,!?_\-]/g, " ");
+    let intent = "UNKNOWN";
+    if (normalized.includes("open") || normalized.includes("account") || normalized.includes("khata") || normalized.includes("खोल") || normalized.includes("திற") || normalized.includes("கணக்கு")) {
+      intent = "OPEN_CUSTOMER";
+    }
+    if (normalized.includes("paid") || normalized.includes("received") || normalized.includes("payment") || normalized.includes("ரூபாய்") || normalized.includes("பணம்") || normalized.includes("பற்று")) {
+      intent = "RECEIVE_PAYMENT";
+    }
+    if (normalized.includes("add") || normalized.includes("sugar") || normalized.includes("rice") || normalized.includes("oil") || normalized.includes("dal") || normalized.includes("கடன்") || normalized.includes("சேர்")) {
+      if (!normalized.includes("paid") && !normalized.includes("received")) {
+        intent = "ADD_PURCHASE";
+      }
+    }
+    if (normalized.includes("report") || normalized.includes("ledger") || normalized.includes("விற்பனை") || normalized.includes("அறிக்கை")) {
+      intent = "SHOW_REPORT";
+    }
+    if (normalized.includes("confirm") || normalized.includes("சரி") || normalized.includes("சேமி")) {
+      intent = "CONFIRM";
+    }
+    if (normalized.includes("cancel") || normalized.includes("வேண்டாம்")) {
+      intent = "CANCEL";
+    }
+
+    let customerName: string | undefined = undefined;
+    for (const c of customers) {
+      if (normalized.includes(c.name.toLowerCase())) {
+        customerName = c.name;
+        break;
+      }
+    }
+
+    let productAlias: string | undefined = undefined;
+    for (const p of products) {
+      const pName = getProductName(p, lang).toLowerCase();
+      if (normalized.includes(pName) || normalized.includes(p.name.toLowerCase())) {
+        productAlias = p.name;
+        break;
+      }
+    }
+    if (!productAlias) {
+      if (normalized.includes("sugar") || normalized.includes("சர்க்கரை") || normalized.includes("चीनी")) productAlias = "Sugar 1 kg";
+      else if (normalized.includes("rice") || normalized.includes("அரிசி") || normalized.includes("चावल")) productAlias = "Sona Masoori Rice";
+      else if (normalized.includes("oil") || normalized.includes("எண்ணெய்") || normalized.includes("तेल")) productAlias = "Sunflower Oil 1 L";
+      else if (normalized.includes("dal") || normalized.includes("பருப்பு") || normalized.includes("दाल")) productAlias = "Toor Dal 1 kg";
+    }
+
+    let amount: string | undefined = undefined;
+    const amtMatch = normalized.match(/(?:rs|rupees|₹)?\s*(\d+(?:\.\d+)?)/);
+    if (amtMatch) {
+      amount = amtMatch[1];
+    }
+
+    let quantity: string | undefined = undefined;
+    const qtyMatch = normalized.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilo|packet|liter|litre|l)/);
+    if (qtyMatch) {
+      quantity = qtyMatch[1];
+    } else {
+      if (normalized.includes("one") || normalized.includes("ஒரு") || normalized.includes("एक") || normalized.includes("1")) quantity = "1";
+      else if (normalized.includes("two") || normalized.includes("இரண்டு") || normalized.includes("दो") || normalized.includes("2")) quantity = "2";
+      else if (normalized.includes("three") || normalized.includes("மூன்று") || normalized.includes("तीन") || normalized.includes("3")) quantity = "3";
+    }
+
+    return {
+      intent,
+      customerName,
+      productAlias,
+      amount,
+      quantity,
+      slots: {
+        confidence: 0.98,
+        detectedLanguage: lang,
+        normalizedText: normalized,
+        raw: text
+      }
+    };
+  }
+
   async function executeDirectCommand(cmd: {
     intent: string;
     customerName?: string;
@@ -894,7 +972,18 @@ function RuralRetailOS() {
                 setBusy(true);
                 setStatus("Parsing transaction command...");
                 try {
-                  const cmd = await parseVoiceCommand(transcript.trim(), language);
+                  let cmd = null;
+                  if (!demoMode && navigator.onLine) {
+                    try {
+                      cmd = await parseVoiceCommand(transcript.trim(), language);
+                    } catch (e) {
+                      console.log("Online parsing unavailable, using local parser.");
+                    }
+                  }
+                  if (!cmd) {
+                    cmd = parseLocalCommand(transcript.trim(), language);
+                  }
+
                   if (cmd) {
                     const confidence = cmd.slots?.confidence ?? 0.85;
                     if (confidence >= 0.95) {
@@ -909,7 +998,7 @@ function RuralRetailOS() {
                     setStatus("Could not parse command. Try using format like: 'Kumar Stores payment 500 rupees'.");
                   }
                 } catch (error) {
-                  setStatus("Failed to parse command. Check server connection.");
+                  setStatus("Failed to parse command.");
                 } finally {
                   setBusy(false);
                 }
