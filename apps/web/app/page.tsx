@@ -856,6 +856,7 @@ function RuralRetailOS() {
             products={products}
             aiQueryOverride={aiQueryOverride}
             setAiQueryOverride={setAiQueryOverride}
+            onRunCommand={handleVoiceCommand}
           />
           <VoiceCard
             transcript={transcript}
@@ -1396,7 +1397,8 @@ function AIAssistant({
   customers,
   products,
   aiQueryOverride,
-  setAiQueryOverride
+  setAiQueryOverride,
+  onRunCommand
 }: {
   status: string;
   setStatus: (value: string) => void;
@@ -1408,6 +1410,13 @@ function AIAssistant({
   products: Product[];
   aiQueryOverride: string;
   setAiQueryOverride: (val: string) => void;
+  onRunCommand: (cmd: {
+    intent: string;
+    customerName?: string;
+    productAlias?: string;
+    amount?: string;
+    quantity?: string;
+  }) => void;
 }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(status === "Ready" ? copy.ready : status);
@@ -1437,7 +1446,20 @@ function AIAssistant({
           name: getProductName(p, language)
         }))
       });
-      const nextAnswer = response?.answer ?? localAiAnswer(copy, customer);
+      let nextAnswer = response?.answer ?? localAiAnswer(copy, customer);
+      
+      // Look for embedded structured command block
+      const match = nextAnswer.match(/```action\s*([\s\S]*?)\s*```/);
+      if (match) {
+        try {
+          const actionCmd = JSON.parse(match[1]);
+          nextAnswer = nextAnswer.replace(/```action[\s\S]*?```/, "").trim();
+          onRunCommand(actionCmd);
+        } catch (e) {
+          console.error("Failed to parse action from AI response:", e);
+        }
+      }
+
       setAnswer(nextAnswer);
       setStatus(nextAnswer);
     } catch {
@@ -1644,20 +1666,44 @@ function AssistantBubble({ text, speakable, language }: { text: string; speakabl
     };
   }, []);
 
-  function handleSpeak() {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
+  async function handleSpeak() {
     if (speaking) {
-      window.speechSynthesis.cancel();
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
       setSpeaking(false);
-    } else {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = language ? speechLangCodes[language] : "en-IN";
-      utterance.onend = () => setSpeaking(false);
-      utterance.onerror = () => setSpeaking(false);
-      window.speechSynthesis.speak(utterance);
-      setSpeaking(true);
+      return;
     }
+
+    setSpeaking(true);
+
+    try {
+      const response = await fetch("http://localhost:5002/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          lang: language ? speechLangCodes[language]?.substring(0, 2) : "en"
+        })
+      });
+      if (response.ok) {
+        setTimeout(() => setSpeaking(false), text.length * 80);
+        return;
+      }
+    } catch (e) {
+      console.log("Local Python TTS service not active, falling back to Web Speech Synthesis API.");
+    }
+
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      setSpeaking(false);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = language ? speechLangCodes[language] : "en-IN";
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    window.speechSynthesis.speak(utterance);
   }
 
   return (

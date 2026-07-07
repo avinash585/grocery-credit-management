@@ -15,22 +15,30 @@ public class SpeechIntelligenceController {
     private final ShopAliasRepository shopAliasRepository;
     private final VoiceLogRepository voiceLogRepository;
     private final LearningHistoryRepository learningHistoryRepository;
+    private final PythonTtsService pythonTtsService;
 
     public SpeechIntelligenceController(
             SpeechIntelligenceService speechIntelligenceService,
             ShopAliasRepository shopAliasRepository,
             VoiceLogRepository voiceLogRepository,
-            LearningHistoryRepository learningHistoryRepository
+            LearningHistoryRepository learningHistoryRepository,
+            PythonTtsService pythonTtsService
     ) {
         this.speechIntelligenceService = speechIntelligenceService;
         this.shopAliasRepository = shopAliasRepository;
         this.voiceLogRepository = voiceLogRepository;
         this.learningHistoryRepository = learningHistoryRepository;
+        this.pythonTtsService = pythonTtsService;
     }
 
     @PostMapping("/normalize")
     public VoiceCommandResponse normalize(@Valid @RequestBody VoiceCommandRequest request) {
-        return speechIntelligenceService.parse(request.transcript(), request.language());
+        VoiceCommandResponse response = speechIntelligenceService.parse(request.transcript(), request.language());
+        if (response.intent() != VoiceIntent.UNKNOWN) {
+            String readText = String.format("Intent parsed: %s.", response.intent().name().replace("_", " ").toLowerCase());
+            pythonTtsService.speak(readText, request.language().name());
+        }
+        return response;
     }
 
     @PostMapping("/learn")

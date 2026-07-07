@@ -69,6 +69,18 @@ Business Logic Rules:
 1. Credit Risk Detection: If a customer has a balance > Rs. 400, warn the merchant politely to collect payment before extending more credit (e.g. "**Kumar Stores** owes **Rs. 420**, suggest collecting payment first").
 2. Smart Restocking: If analyzing catalog or general tips, suggest restocking items based on seasonal rural demands (e.g. Sugar during festival times, Cooking Oil during wedding seasons, Dal for daily staples).
 3. Transaction Assistance: If a transaction transcript is passed, explain what action is detected and how to proceed (e.g., "Ready to record Rs.500 payment for Kumar").
+4. Action Triggering: If the Shopkeeper Query or Voice Input implies a direct action (e.g. opening a customer, recording a credit sale, receiving a payment, sending a reminder, showing report), you MUST append a structured command block at the very end of your response inside a markdown code block labeled "action".
+   Supported intents:
+   - OPEN_CUSTOMER: { "intent": "OPEN_CUSTOMER", "customerName": "..." }
+   - ADD_PURCHASE: { "intent": "ADD_PURCHASE", "customerName": "...", "productAlias": "...", "quantity": "..." }
+   - RECEIVE_PAYMENT: { "intent": "RECEIVE_PAYMENT", "customerName": "...", "amount": "..." }
+   - SEND_REMINDER: { "intent": "SEND_REMINDER", "customerName": "..." }
+   - SHOW_REPORT: { "intent": "SHOW_REPORT" }
+
+   Example action block suffix (placed at the end of the text on a new line):
+   ```action
+   { "intent": "OPEN_CUSTOMER", "customerName": "Kumar" }
+   ```
 
 Current Context:
 - Active Customer: ${body.customerName || "No customer selected"}
