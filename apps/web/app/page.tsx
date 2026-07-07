@@ -1763,7 +1763,7 @@ function ProductSearchPanel({
               >
                 <div>
                   <div className="flex justify-between items-start gap-2">
-                    <span className="text-xl" title={p.category}>{getCategoryIcon(p.category)}</span>
+                    <span className="text-xl" title={p.category}>{getCategoryIcon(p.category ?? "")}</span>
                     <span className="rounded-full bg-leaf-50 px-2 py-0.5 text-[10px] font-black text-leaf-800 uppercase">
                       {p.brand || "Generic"}
                     </span>
