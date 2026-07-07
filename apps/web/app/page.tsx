@@ -102,6 +102,32 @@ function RuralRetailOS() {
   } | null>(null);
   const [aiQueryOverride, setAiQueryOverride] = useState("");
   const [learningWord, setLearningWord] = useState("");
+  const [cart, setCart] = useState<Array<{ product: Product; quantity: string }>>([]);
+
+  function addToCart(product: Product, quantity: string = "1") {
+    setCart(prev => {
+      const existing = prev.find(item => item.product.id === product.id);
+      if (existing) {
+        const nextQty = Math.max(1, Number(existing.quantity) + Number(quantity));
+        return prev.map(item => item.product.id === product.id 
+          ? { ...item, quantity: String(nextQty) } 
+          : item
+        );
+      }
+      return [...prev, { product, quantity }];
+    });
+    setStatus(`Added to cart: ${getProductName(product, language)}.`);
+  }
+
+  function removeFromCart(productId: string) {
+    setCart(prev => prev.filter(item => item.product.id !== productId));
+    setStatus("Removed item from cart.");
+  }
+
+  function clearCart() {
+    setCart([]);
+    setStatus("Cart cleared.");
+  }
 
   async function learnAlias(category: "CUSTOMER" | "PRODUCT", canonicalId: string, aliasValue: string) {
     try {
@@ -336,16 +362,30 @@ function RuralRetailOS() {
     }
   }
 
-  async function executeSaveCredit(product: Product, quantity: string) {
+  async function executeSaveCredit(product: Product | null, quantity: string) {
     if (!requireSession() || !requireCustomer()) return;
+    if (cart.length === 0 && !product) {
+      setStatus("Cart is empty. Search and add products first.");
+      return;
+    }
+
+    const itemsToSave = cart.length > 0
+      ? cart
+      : [{ product: product!, quantity }];
+
     setBusy(true);
     setStatus("Saving credit sale...");
+
+    let total = 0;
+    itemsToSave.forEach(item => {
+      total += Number(item.product.sellingPrice) * Number(item.quantity);
+    });
+
     if (demoMode) {
-      const qty = Number(quantity);
-      const total = Number(product.sellingPrice) * (Number.isFinite(qty) ? qty : 1);
       updateCustomerBalance(total);
       setTodayCreditVal(prev => prev + total);
       setTodaySalesVal(prev => prev + total);
+      clearCart();
       setSelectedProduct(null);
       setVoiceQuantity("1");
       setPendingVoiceCommand(null);
@@ -357,22 +397,25 @@ function RuralRetailOS() {
       const bill = await createCreditBill({
         customerId: selectedCustomer!.id,
         creditBill: true,
-        items: [{ productId: product.id, quantity }]
+        items: itemsToSave.map(item => ({
+          productId: item.product.id,
+          quantity: item.quantity
+        }))
       });
-      const total = Number(bill?.totalAmount ?? "0");
-      updateCustomerBalance(total);
-      setStatus(`Credit sale saved: Rs.${total}`);
-      setTodayCreditVal(prev => prev + total);
-      setTodaySalesVal(prev => prev + total);
+      const billTotal = Number(bill?.totalAmount ?? "0");
+      updateCustomerBalance(billTotal);
+      setStatus(`Credit sale saved: Rs.${billTotal}`);
+      setTodayCreditVal(prev => prev + billTotal);
+      setTodaySalesVal(prev => prev + billTotal);
+      clearCart();
       setSelectedProduct(null);
       setVoiceQuantity("1");
       setPendingVoiceCommand(null);
     } catch (error) {
-      const qty = Number(quantity);
-      const total = Number(product.sellingPrice) * (Number.isFinite(qty) ? qty : 1);
       updateCustomerBalance(total);
       setTodayCreditVal(prev => prev + total);
       setTodaySalesVal(prev => prev + total);
+      clearCart();
       setSelectedProduct(null);
       setVoiceQuantity("1");
       setPendingVoiceCommand(null);
@@ -385,14 +428,7 @@ function RuralRetailOS() {
 
   async function submitCreditBill(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedProduct) {
-      setStatus("Search and select a product first.");
-      setActiveTask("products");
-      return;
-    }
-    const data = new FormData(event.currentTarget);
-    const quantity = String(data.get("quantity") ?? "1");
-    await executeSaveCredit(selectedProduct, quantity);
+    await executeSaveCredit(null, "1");
   }
 
   async function executeSavePayment(amount: number) {
@@ -918,12 +954,11 @@ function RuralRetailOS() {
             onView={setView}
             onProductSearch={submitProductSearch}
             onProductSelect={(product) => {
-              setSelectedProduct(product);
+              addToCart(product, "1");
               setActiveTask("credit");
               if (selectedCustomer) {
                 setView("billing");
               }
-              setStatus(`${getProductName(product, language)} selected for ${selectedCustomer?.name ?? "customer"}.`);
             }}
             onCreditSubmit={submitCreditBill}
             onPaymentSubmit={submitPayment}
@@ -937,6 +972,10 @@ function RuralRetailOS() {
             onCancelVoice={handleCancelVoice}
             merchantUpiId={merchantUpiId}
             onChangeUpiId={handleUpdateUpiId}
+            cart={cart}
+            onAddToCart={addToCart}
+            onRemoveFromCart={removeFromCart}
+            onClearCart={clearCart}
             language={language}
           />
         </section>
@@ -1093,6 +1132,10 @@ function CustomerWorkspace(props: {
   merchantUpiId: string;
   onChangeUpiId: (id: string) => void;
   language: Language;
+  cart: Array<{ product: Product; quantity: string }>;
+  onAddToCart: (product: Product, quantity: string) => void;
+  onRemoveFromCart: (productId: string) => void;
+  onClearCart: () => void;
 }) {
   const { customer, customers, activeTask, onTask, view } = props;
   return (
@@ -1150,7 +1193,22 @@ function CustomerWorkspace(props: {
 
           <div className="rounded-md border border-leaf-100 bg-[#fbfcf8] p-4">
             {activeTask === "products" && <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} />}
-            {activeTask === "credit" && <CreditPanel product={props.selectedProduct} onSubmit={props.onCreditSubmit} onFindProduct={() => { props.onView("products"); onTask("products"); }} busy={props.busy} copy={props.copy} value={props.voiceQuantity} onChange={props.setVoiceQuantity} language={props.language} />}
+            {activeTask === "credit" && (
+              <CreditPanel
+                product={props.selectedProduct}
+                onSubmit={props.onCreditSubmit}
+                onFindProduct={() => { props.onView("products"); onTask("products"); }}
+                busy={props.busy}
+                copy={props.copy}
+                value={props.voiceQuantity}
+                onChange={props.setVoiceQuantity}
+                language={props.language}
+                cart={props.cart}
+                onAddToCart={props.onAddToCart}
+                onRemoveFromCart={props.onRemoveFromCart}
+                onClearCart={props.onClearCart}
+              />
+            )}
             {activeTask === "payment" && (
               <PaymentPanel
                 onSubmit={props.onPaymentSubmit}
@@ -1389,18 +1447,122 @@ function ProductSearchPanel({ products, onSearch, onSelect, busy, copy, language
   );
 }
 
-function CreditPanel({ product, onSubmit, onFindProduct, busy, copy, value, onChange, language }: { product: Product | null; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onFindProduct: () => void; busy: boolean; copy: ReturnType<typeof t>; value: string; onChange: (val: string) => void; language: Language }) {
+function CreditPanel({
+  product,
+  onSubmit,
+  onFindProduct,
+  busy,
+  copy,
+  value,
+  onChange,
+  language,
+  cart,
+  onAddToCart,
+  onRemoveFromCart,
+  onClearCart
+}: {
+  product: Product | null;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onFindProduct: () => void;
+  busy: boolean;
+  copy: ReturnType<typeof t>;
+  value: string;
+  onChange: (val: string) => void;
+  language: Language;
+  cart: Array<{ product: Product; quantity: string }>;
+  onAddToCart: (product: Product, quantity: string) => void;
+  onRemoveFromCart: (productId: string) => void;
+  onClearCart: () => void;
+}) {
+  const totalBill = cart.reduce((sum, item) => sum + Number(item.product.sellingPrice) * Number(item.quantity), 0);
+
   return (
     <div>
       <h3 className="text-2xl font-black">{copy.addPurchase}</h3>
-      <div className="mt-3 rounded-md bg-white p-3">
-        <p className="text-sm font-bold text-ink/60">{copy.selectedProduct}</p>
-        <p className="text-xl font-black">{product ? getProductName(product, language) : copy.noProductSelected}</p>
-        <button type="button" onClick={onFindProduct} className="mt-2 rounded-md bg-leaf-50 px-3 py-2 font-black text-leaf-700">{copy.findProduct}</button>
+      
+      {/* Search & Add Products */}
+      <div className="mt-3 flex justify-between items-center bg-white p-3 rounded-md border border-leaf-100">
+        <span className="font-bold text-ink/70">Need more items?</span>
+        <button type="button" onClick={onFindProduct} className="rounded bg-leaf-600 px-3 py-1.5 font-bold text-white hover:bg-leaf-700 transition">
+          {copy.findProduct}
+        </button>
       </div>
-      <form onSubmit={onSubmit} className="mt-3 flex flex-col gap-3 sm:flex-row">
-        <Input name="quantity" label={copy.quantity} value={value} onChange={(e) => onChange(e.target.value)} />
-        <button disabled={busy} className="min-h-14 rounded-md bg-leaf-600 px-5 font-black text-white disabled:opacity-60">{copy.saveCredit}</button>
+
+      {/* Cart Items List */}
+      <div className="mt-3 space-y-2">
+        <p className="text-sm font-bold uppercase tracking-wider text-leaf-700">Shopping Cart ({cart.length} items)</p>
+        
+        {cart.length === 0 ? (
+          <div className="rounded-md border border-dashed border-leaf-200 bg-white p-6 text-center text-ink/50 font-medium">
+            No items in cart. Add products to get started.
+          </div>
+        ) : (
+          <div className="rounded-md bg-white border border-leaf-100 overflow-hidden">
+            {cart.map((item) => {
+              const itemTotal = Number(item.product.sellingPrice) * Number(item.quantity);
+              return (
+                <div key={item.product.id} className="flex items-center justify-between border-b border-leaf-50 p-3 last:border-b-0 hover:bg-leaf-50/30 transition">
+                  <div className="flex-1">
+                    <p className="font-black text-sm text-ink">{getProductName(item.product, language)}</p>
+                    <p className="text-xs font-bold text-ink/50">Rs.{item.product.sellingPrice} each</p>
+                  </div>
+                  
+                  {/* Quantity controls */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onAddToCart(item.product, "-1")}
+                      disabled={Number(item.quantity) <= 1}
+                      className="h-6 w-6 rounded border border-leaf-200 bg-white font-bold text-ink hover:bg-leaf-50 disabled:opacity-50 transition flex items-center justify-center text-xs"
+                    >
+                      -
+                    </button>
+                    <span className="w-8 text-center text-sm font-black">{item.quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => onAddToCart(item.product, "1")}
+                      className="h-6 w-6 rounded border border-leaf-200 bg-white font-bold text-ink hover:bg-leaf-50 transition flex items-center justify-center text-xs"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <div className="w-20 text-right font-black text-sm text-ink ml-3">
+                    Rs.{itemTotal.toFixed(2)}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onRemoveFromCart(item.product.id)}
+                    className="ml-3 text-red-600 hover:text-red-800 transition font-black text-lg"
+                    title="Remove item"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+            
+            <div className="bg-leaf-50/50 p-3 flex justify-between items-center border-t border-leaf-100">
+              <button type="button" onClick={onClearCart} className="text-xs font-black text-red-600 hover:text-red-800 transition">
+                Clear Cart
+              </button>
+              <div className="text-right">
+                <span className="text-xs font-bold text-ink/60 mr-2">Total Due:</span>
+                <span className="text-lg font-black text-leaf-800">Rs.{totalBill.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={onSubmit} className="mt-4">
+        <button
+          disabled={busy || cart.length === 0}
+          className="min-h-14 w-full rounded-md bg-leaf-600 px-5 font-black text-white hover:bg-leaf-700 transition disabled:opacity-60 text-lg shadow-soft"
+        >
+          {copy.saveCredit} {cart.length > 0 ? `(Rs.${totalBill.toFixed(2)})` : ""}
+        </button>
       </form>
     </div>
   );
