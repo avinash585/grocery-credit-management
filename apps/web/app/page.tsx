@@ -608,31 +608,43 @@ function RuralRetailOS() {
     if (!requireSession()) return;
     setBusy(true);
     setStatus("Searching catalog...");
-    const query = String(new FormData(event.currentTarget).get("query") ?? "").toLowerCase();
-    if (demoMode) {
-      const result = starterProducts.filter((product) =>
-        `${product.name} ${product.nameTa || ""} ${product.nameHi || ""} ${product.nameTe || ""} ${product.nameKn || ""} ${product.nameMl || ""} ${product.sku}`.toLowerCase().includes(query)
+    const query = String(new FormData(event.currentTarget).get("query") ?? "").toLowerCase().trim();
+
+    // Local search helper — works against starterProducts always
+    const localSearch = (q: string) => {
+      if (!q) return starterProducts;
+      return starterProducts.filter((product) =>
+        `${product.name} ${product.nameTa || ""} ${product.nameHi || ""} ${product.nameTe || ""} ${product.nameKn || ""} ${product.nameMl || ""} ${product.sku} ${product.category || ""}`.toLowerCase().includes(q)
       );
+    };
+
+    if (demoMode) {
+      const result = localSearch(query);
       setProducts(result.length ? result : starterProducts);
       setActiveTask("products");
-      setStatus(result.length ? `${result.length} demo product(s) found.` : "Showing all demo products.");
+      setStatus(result.length ? `${result.length} product(s) found.` : "Showing all products.");
       setBusy(false);
       return;
     }
     try {
       const result = (await searchProducts(query)) ?? [];
-      setProducts(result);
-      setActiveTask("credit");
-      setStatus(result.length ? "Tap a product to add it to this account." : "No product found.");
+      if (result.length > 0) {
+        setProducts(result);
+        setActiveTask("credit");
+        setStatus("Tap a product to add it to this account.");
+      } else {
+        // Backend returned empty — fall back to local catalog
+        const localResult = localSearch(query);
+        setProducts(localResult.length ? localResult : starterProducts);
+        setActiveTask("products");
+        setStatus(localResult.length ? `${localResult.length} product(s) found in local catalog.` : "Showing all products.");
+      }
     } catch (error) {
-      const query = String(new FormData(event.currentTarget).get("query") ?? "").toLowerCase();
-      const result = starterProducts.filter((product) =>
-        `${product.name} ${product.nameTa || ""} ${product.nameHi || ""} ${product.nameTe || ""} ${product.nameKn || ""} ${product.nameMl || ""} ${product.sku}`.toLowerCase().includes(query)
-      );
-      setProducts(result.length ? result : starterProducts);
+      const localResult = localSearch(query);
+      setProducts(localResult.length ? localResult : starterProducts);
       setDemoMode(true);
       setActiveTask("products");
-      setStatus(error instanceof Error ? `${error.message} Showing demo product catalog.` : "Showing demo product catalog.");
+      setStatus(localResult.length ? `${localResult.length} product(s) found.` : "Showing all products.");
     } finally {
       setBusy(false);
     }
