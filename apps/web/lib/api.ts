@@ -23,14 +23,14 @@ export type Product = {
   nameKn?: string;
   nameMl?: string;
   barcode?: string;
-  category: string;
+  category?: string;
   brand?: string;
-  unit: string;
+  unit?: string;
   purchasePrice?: string;
   mrp?: string;
   gstPercentage?: string;
   stockQuantity?: string;
-  enabled: boolean;
+  enabled?: boolean;
   imageUrl?: string;
   aliases?: string;
 };
