@@ -54,6 +54,9 @@ public class Product extends BaseEntity {
     @Column(name = "gst_percentage", precision = 5, scale = 2)
     private BigDecimal gstPercentage = BigDecimal.ZERO;
 
+    @Column(name = "default_selling_price", precision = 12, scale = 2)
+    private BigDecimal defaultSellingPrice = BigDecimal.ZERO;
+
     @Column(name = "name_en", nullable = false)
     private String nameEn;
 
@@ -120,4 +123,6 @@ public class Product extends BaseEntity {
     public void setMrp(BigDecimal mrp) { this.mrp = mrp; }
     public BigDecimal getGstPercentage() { return gstPercentage; }
     public void setGstPercentage(BigDecimal gstPercentage) { this.gstPercentage = gstPercentage; }
+    public BigDecimal getDefaultSellingPrice() { return defaultSellingPrice; }
+    public void setDefaultSellingPrice(BigDecimal defaultSellingPrice) { this.defaultSellingPrice = defaultSellingPrice; }
 }

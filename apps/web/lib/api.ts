@@ -33,6 +33,7 @@ export type Product = {
   enabled?: boolean;
   imageUrl?: string;
   aliases?: string;
+  defaultSellingPrice?: string;
 };
 
 export type BillResponse = {

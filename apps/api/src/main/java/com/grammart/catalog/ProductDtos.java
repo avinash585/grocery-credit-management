@@ -27,7 +27,8 @@ public final class ProductDtos {
         BigDecimal stockQuantity,
         boolean enabled,
         String imageUrl,
-        String aliases
+        String aliases,
+        BigDecimal defaultSellingPrice
     ) {
         static ProductResponse from(Product product) {
             return new ProductResponse(
@@ -50,7 +51,8 @@ public final class ProductDtos {
                 product.getStockQuantity(),
                 product.isEnabled(),
                 product.getImageUrl(),
-                product.getAliases()
+                product.getAliases(),
+                product.getDefaultSellingPrice()
             );
         }
     }

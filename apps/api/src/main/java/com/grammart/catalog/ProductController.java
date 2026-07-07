@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,10 +18,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class ProductController {
     private final ProductRepository products;
     private final ShopRepository shops;
+    private final JdbcTemplate jdbcTemplate;
 
-    public ProductController(ProductRepository products, ShopRepository shops) {
+    public ProductController(ProductRepository products, ShopRepository shops, JdbcTemplate jdbcTemplate) {
         this.products = products;
         this.shops = shops;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @GetMapping
@@ -99,6 +102,9 @@ public class ProductController {
             p = clone;
         }
 
+        BigDecimal oldPrice = p.getSellingPrice();
+        BigDecimal newPrice = input.getSellingPrice();
+
         if (input.getSellingPrice() != null) p.setSellingPrice(input.getSellingPrice());
         if (input.getPurchasePrice() != null) p.setPurchasePrice(input.getPurchasePrice());
         if (input.getMrp() != null) p.setMrp(input.getMrp());
@@ -109,7 +115,22 @@ public class ProductController {
         if (input.getNameTa() != null) p.setNameTa(input.getNameTa());
         if (input.getNameHi() != null) p.setNameHi(input.getNameHi());
         
-        return ProductResponse.from(products.save(p));
+        Product saved = products.save(p);
+
+        if (newPrice != null && oldPrice != null && oldPrice.compareTo(newPrice) != 0) {
+            try {
+                jdbcTemplate.update(
+                    "insert into product_price_history (id, product_id, old_selling_price, new_selling_price, changed_at) values (uuid_to_bin(uuid()), uuid_to_bin(?), ?, ?, current_timestamp(6))",
+                    saved.getId().toString(),
+                    oldPrice,
+                    newPrice
+                );
+            } catch (Exception e) {
+                // Ignore audit failure so operation does not crash
+            }
+        }
+
+        return ProductResponse.from(saved);
     }
 
     @PutMapping("/{id}/status")
