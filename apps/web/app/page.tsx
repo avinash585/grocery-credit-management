@@ -515,6 +515,8 @@ function RuralRetailOS() {
         qty = match ? match[0] : "1";
       }
       
+      setView("billing");
+      setActiveTask("credit");
       setBusy(true);
       setStatus(`Directly executing: credit sale of ${qty} ${matchedProd.name} for ${currentCust.name}...`);
       try {
@@ -543,6 +545,8 @@ function RuralRetailOS() {
       }
       if (amt <= 0) return;
       
+      setView("billing");
+      setActiveTask("payment");
       setBusy(true);
       setStatus(`Directly executing: receiving payment of Rs.${amt} from ${currentCust.name}...`);
       try {
@@ -705,6 +709,35 @@ function RuralRetailOS() {
     }
   }
 
+  function handleConfirmVoice() {
+    if (pendingVoiceCommand) {
+      if (pendingVoiceCommand.intent === "ADD_PURCHASE") {
+        let prod = selectedProduct;
+        if (!prod && pendingVoiceCommand.productAlias) {
+          const alias = pendingVoiceCommand.productAlias.toLowerCase().trim();
+          prod = products.find(p => p.name.toLowerCase().includes(alias) || p.sku.toLowerCase().includes(alias)) || null;
+        }
+        if (prod) {
+          executeSaveCredit(prod, voiceQuantity);
+        } else {
+          setStatus("No product selected or found to save.");
+        }
+      } else if (pendingVoiceCommand.intent === "RECEIVE_PAYMENT") {
+        executeSavePayment(Number(voiceAmount || 0));
+      }
+      setPendingVoiceCommand(null);
+    }
+  }
+
+  function handleCancelVoice() {
+    setPendingVoiceCommand(null);
+    setSelectedProduct(null);
+    setVoiceAmount("");
+    setVoiceQuantity("1");
+    setStatus("Voice action cancelled.");
+  }
+
+
   return (
     <main className="min-h-screen bg-[#f4f7f1] pb-28 text-ink">
       <section className="border-b border-leaf-100 bg-white/90 backdrop-blur">
@@ -822,22 +855,8 @@ function RuralRetailOS() {
             voiceAmount={voiceAmount}
             setVoiceAmount={setVoiceAmount}
             pendingVoiceCommand={pendingVoiceCommand}
-            onConfirmVoice={() => {
-              if (pendingVoiceCommand) {
-                if (pendingVoiceCommand.intent === "ADD_PURCHASE" && selectedProduct) {
-                  executeSaveCredit(selectedProduct, voiceQuantity);
-                } else if (pendingVoiceCommand.intent === "RECEIVE_PAYMENT") {
-                  executeSavePayment(Number(voiceAmount || 0));
-                }
-              }
-            }}
-            onCancelVoice={() => {
-              setPendingVoiceCommand(null);
-              setSelectedProduct(null);
-              setVoiceAmount("");
-              setVoiceQuantity("1");
-              setStatus("Voice action cancelled.");
-            }}
+            onConfirmVoice={handleConfirmVoice}
+            onCancelVoice={handleCancelVoice}
             merchantUpiId={merchantUpiId}
             onChangeUpiId={handleUpdateUpiId}
             language={language}
@@ -929,6 +948,17 @@ function RuralRetailOS() {
                   Ignore
                 </button>
               </div>
+            </div>
+          )}
+          {pendingVoiceCommand && (
+            <div className="mt-3 rounded-md border border-leaf-200 bg-white p-4 shadow-md">
+              <p className="text-xs font-black uppercase tracking-wide text-leaf-700 mb-2">Pending Voice Command</p>
+              <VoiceCommandVerificationCard
+                command={pendingVoiceCommand}
+                onConfirm={handleConfirmVoice}
+                onCancel={handleCancelVoice}
+                copy={copy}
+              />
             </div>
           )}
         </aside>
