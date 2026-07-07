@@ -156,7 +156,7 @@ function RuralRetailOS() {
     }
     try {
       const updated = await saveProductUpdate(productId, payload);
-      setProducts(prev => prev.map(p => p.id === productId ? updated : p));
+      setProducts(prev => prev.map(p => p.id === productId ? (updated ?? p) : p));
       setStatus("Product catalog updated successfully.");
     } catch (e) {
       setProducts(prev => prev.map(p => p.id === productId ? { ...p, ...payload } : p));
@@ -183,7 +183,7 @@ function RuralRetailOS() {
     }
     try {
       const updated = await toggleProductStatus(productId, enabled);
-      setProducts(prev => prev.map(p => p.id === productId ? updated : p));
+      setProducts(prev => prev.map(p => p.id === productId ? (updated ?? p) : p));
       setStatus(`Product status changed to: ${enabled ? "Enabled" : "Disabled"}.`);
     } catch (e) {
       setProducts(prev => prev.map(p => p.id === productId ? { ...p, enabled } : p));
@@ -227,11 +227,15 @@ function RuralRetailOS() {
     }
     try {
       const created = await createProduct(fullPayload);
-      setProducts(prev => [created, ...prev]);
-      addToCart(created, "1");
-      setView("billing");
-      setActiveTask("credit");
-      setStatus(`Created product "${name}" and added to cart.`);
+      if (created) {
+        setProducts(prev => [created, ...prev]);
+        addToCart(created, "1");
+        setView("billing");
+        setActiveTask("credit");
+        setStatus(`Created product "${name}" and added to cart.`);
+      } else {
+        throw new Error("Failed to create product");
+      }
     } catch (e) {
       const newProduct: Product = {
         id: `custom-${Date.now()}`,
