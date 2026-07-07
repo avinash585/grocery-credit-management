@@ -417,7 +417,7 @@ public class SpeechIntelligenceService {
                 response.productAlias(),
                 response.amount(),
                 response.quantity(),
-                response.unit(),
+                (String) response.slots().getOrDefault("unit", null),
                 confScoreObj >= 0.95 ? "EXECUTED" : "PENDING_CONFIRMATION"
             );
             log.addSpeechCommand(cmd);
