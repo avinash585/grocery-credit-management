@@ -78,9 +78,9 @@ Business Logic Rules:
    - SHOW_REPORT: { "intent": "SHOW_REPORT" }
 
    Example action block suffix (placed at the end of the text on a new line):
-   \```action
+   \`\`\`action
    { "intent": "OPEN_CUSTOMER", "customerName": "Kumar" }
-   \```
+   \`\`\`
 
 Current Context:
 - Active Customer: ${body.customerName || "No customer selected"}
