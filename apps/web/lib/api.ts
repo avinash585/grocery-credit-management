@@ -22,6 +22,17 @@ export type Product = {
   nameTe?: string;
   nameKn?: string;
   nameMl?: string;
+  barcode?: string;
+  category: string;
+  brand?: string;
+  unit: string;
+  purchasePrice?: string;
+  mrp?: string;
+  gstPercentage?: string;
+  stockQuantity?: string;
+  enabled: boolean;
+  imageUrl?: string;
+  aliases?: string;
 };
 
 export type BillResponse = {
@@ -136,15 +147,16 @@ export async function searchCustomers(query: string) {
   }
 }
 
-export async function searchProducts(query: string) {
+export async function searchProducts(query: string, enabled?: boolean) {
   if (typeof navigator !== "undefined" && !navigator.onLine) {
     const cached = await getCachedProducts();
     const q = query.toLowerCase().trim();
     if (!q) return cached;
-    return cached.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+    return cached.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || (p.barcode && p.barcode.includes(q)) || p.category.toLowerCase().includes(q) || (p.brand && p.brand.toLowerCase().includes(q)));
   }
   try {
-    const results = await apiFetch<Product[]>(`/products?query=${encodeURIComponent(query)}`);
+    const enabledParam = enabled !== undefined ? `&enabled=${enabled}` : "";
+    const results = await apiFetch<Product[]>(`/products?query=${encodeURIComponent(query)}${enabledParam}`);
     if (results && !query) {
       void cacheProducts(results);
     }
@@ -153,8 +165,28 @@ export async function searchProducts(query: string) {
     const cached = await getCachedProducts();
     const q = query.toLowerCase().trim();
     if (!q) return cached;
-    return cached.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+    return cached.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || (p.barcode && p.barcode.includes(q)) || p.category.toLowerCase().includes(q) || (p.brand && p.brand.toLowerCase().includes(q)));
   }
+}
+
+export function saveProductUpdate(id: string, payload: Partial<Product>) {
+  return apiFetch<Product>(`/products/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function toggleProductStatus(id: string, enabled: boolean) {
+  return apiFetch<Product>(`/products/${id}/status?enabled=${enabled}`, {
+    method: "PUT"
+  });
+}
+
+export function createProduct(payload: Partial<Product>) {
+  return apiFetch<Product>("/products", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }
 
 export function createCreditBill(payload: { customerId: string; creditBill: boolean; items: Array<{ productId: string; quantity: string }> }) {

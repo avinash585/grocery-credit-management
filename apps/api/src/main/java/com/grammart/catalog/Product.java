@@ -45,6 +45,15 @@ public class Product extends BaseEntity {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    @Column(name = "purchase_price", precision = 12, scale = 2)
+    private BigDecimal purchasePrice = BigDecimal.ZERO;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal mrp = BigDecimal.ZERO;
+
+    @Column(name = "gst_percentage", precision = 5, scale = 2)
+    private BigDecimal gstPercentage = BigDecimal.ZERO;
+
     @Column(name = "name_en", nullable = false)
     private String nameEn;
 
@@ -69,27 +78,46 @@ public class Product extends BaseEntity {
     protected Product() {
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public String getSku() {
-        return sku;
-    }
-
-    public String getNameEn() {
-        return nameEn;
-    }
-
-    public BigDecimal getSellingPrice() {
-        return sellingPrice;
-    }
-
-    public String getUnit() {
-        return unit;
-    }
-
-    public boolean isEnabled() {
-        return enabled;
-    }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public Shop getShop() { return shop; }
+    public void setShop(Shop shop) { this.shop = shop; }
+    public String getSku() { return sku; }
+    public void setSku(String sku) { this.sku = sku; }
+    public String getBarcode() { return barcode; }
+    public void setBarcode(String barcode) { this.barcode = barcode; }
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+    public String getBrand() { return brand; }
+    public void setBrand(String brand) { this.brand = brand; }
+    public String getUnit() { return unit; }
+    public void setUnit(String unit) { this.unit = unit; }
+    public BigDecimal getSellingPrice() { return sellingPrice; }
+    public void setSellingPrice(BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
+    public BigDecimal getStockQuantity() { return stockQuantity; }
+    public void setStockQuantity(BigDecimal stockQuantity) { this.stockQuantity = stockQuantity; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public boolean isEnabled() { return enabled; }
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public String getNameEn() { return nameEn; }
+    public void setNameEn(String nameEn) { this.nameEn = nameEn; }
+    public String getNameTa() { return nameTa; }
+    public void setNameTa(String nameTa) { this.nameTa = nameTa; }
+    public String getNameHi() { return nameHi; }
+    public void setNameHi(String nameHi) { this.nameHi = nameHi; }
+    public String getNameTe() { return nameTe; }
+    public void setNameTe(String nameTe) { this.nameTe = nameTe; }
+    public String getNameKn() { return nameKn; }
+    public void setNameKn(String nameKn) { this.nameKn = nameKn; }
+    public String getNameMl() { return nameMl; }
+    public void setNameMl(String nameMl) { this.nameMl = nameMl; }
+    public String getAliases() { return aliases; }
+    public void setAliases(String aliases) { this.aliases = aliases; }
+    public BigDecimal getPurchasePrice() { return purchasePrice; }
+    public void setPurchasePrice(BigDecimal purchasePrice) { this.purchasePrice = purchasePrice; }
+    public BigDecimal getMrp() { return mrp; }
+    public void setMrp(BigDecimal mrp) { this.mrp = mrp; }
+    public BigDecimal getGstPercentage() { return gstPercentage; }
+    public void setGstPercentage(BigDecimal gstPercentage) { this.gstPercentage = gstPercentage; }
 }

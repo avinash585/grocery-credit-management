@@ -16,7 +16,18 @@ public final class ProductDtos {
         String nameHi,
         String nameTe,
         String nameKn,
-        String nameMl
+        String nameMl,
+        String barcode,
+        String category,
+        String brand,
+        String unit,
+        BigDecimal purchasePrice,
+        BigDecimal mrp,
+        BigDecimal gstPercentage,
+        BigDecimal stockQuantity,
+        boolean enabled,
+        String imageUrl,
+        String aliases
     ) {
         static ProductResponse from(Product product) {
             return new ProductResponse(
@@ -28,7 +39,18 @@ public final class ProductDtos {
                 product.getNameHi(),
                 product.getNameTe(),
                 product.getNameKn(),
-                product.getNameMl()
+                product.getNameMl(),
+                product.getBarcode(),
+                product.getCategory(),
+                product.getBrand(),
+                product.getUnit(),
+                product.getPurchasePrice(),
+                product.getMrp(),
+                product.getGstPercentage(),
+                product.getStockQuantity(),
+                product.isEnabled(),
+                product.getImageUrl(),
+                product.getAliases()
             );
         }
     }

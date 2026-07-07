@@ -45,7 +45,10 @@ import {
   searchCustomers,
   searchProducts,
   parseVoiceCommand,
-  learnVoiceAlias
+  learnVoiceAlias,
+  saveProductUpdate,
+  toggleProductStatus,
+  createProduct
 } from "@/lib/api";
 import { Language, t } from "@/lib/i18n";
 import { readQueue, useNetworkStatus, syncOfflineQueue } from "@/lib/offline";
@@ -130,19 +133,121 @@ function RuralRetailOS() {
     setStatus("Cart cleared.");
   }
 
-  function handleAddCustomProduct(name: string, price: number) {
-    const newProduct: Product = {
-      id: `custom-${Date.now()}`,
-      sku: `CUSTOM-${Date.now().toString().slice(-6)}`,
-      name,
-      sellingPrice: price.toFixed(2)
+  async function editProductPriceAndStock(productId: string, sellingPrice: string, stockQuantity: string, purchasePrice?: string, mrp?: string) {
+    setBusy(true);
+    setStatus("Updating product catalog...");
+    const payload: Partial<Product> = {
+      sellingPrice,
+      stockQuantity: String(Math.max(0, Number(stockQuantity || 0)))
     };
-    setProducts(prev => [newProduct, ...prev]);
-    starterProducts.unshift(newProduct);
-    addToCart(newProduct, "1");
-    setView("billing");
-    setActiveTask("credit");
-    setStatus(`Created custom product "${name}" and added to cart.`);
+    if (purchasePrice) payload.purchasePrice = purchasePrice;
+    if (mrp) payload.mrp = mrp;
+
+    if (demoMode) {
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, ...payload } : p));
+      starterProducts.forEach((p, idx) => {
+        if (p.id === productId) {
+          starterProducts[idx] = { ...p, ...payload } as any;
+        }
+      });
+      setBusy(false);
+      setStatus("Demo product catalog updated successfully.");
+      return;
+    }
+    try {
+      const updated = await saveProductUpdate(productId, payload);
+      setProducts(prev => prev.map(p => p.id === productId ? updated : p));
+      setStatus("Product catalog updated successfully.");
+    } catch (e) {
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, ...payload } : p));
+      setStatus("Demo fallback: Product catalog updated locally.");
+      setDemoMode(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleProductActive(productId: string, enabled: boolean) {
+    setBusy(true);
+    setStatus("Toggling product status...");
+    if (demoMode) {
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, enabled } : p));
+      starterProducts.forEach((p, idx) => {
+        if (p.id === productId) {
+          starterProducts[idx] = { ...p, enabled } as any;
+        }
+      });
+      setBusy(false);
+      setStatus(`Product status changed to: ${enabled ? "Enabled" : "Disabled"}.`);
+      return;
+    }
+    try {
+      const updated = await toggleProductStatus(productId, enabled);
+      setProducts(prev => prev.map(p => p.id === productId ? updated : p));
+      setStatus(`Product status changed to: ${enabled ? "Enabled" : "Disabled"}.`);
+    } catch (e) {
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, enabled } : p));
+      setStatus(`Demo fallback: Product status changed to ${enabled ? "Enabled" : "Disabled"}.`);
+      setDemoMode(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addCustomProductToStore(name: string, price: number, extra?: { purchasePrice?: string; mrp?: string; category?: string; unit?: string; barcode?: string; brand?: string }) {
+    setBusy(true);
+    setStatus("Creating product...");
+    const fullPayload: Partial<Product> = {
+      name,
+      sellingPrice: price.toFixed(2),
+      purchasePrice: extra?.purchasePrice || (price * 0.8).toFixed(2),
+      mrp: extra?.mrp || (price * 1.15).toFixed(2),
+      category: extra?.category || "Staples",
+      unit: extra?.unit || "kg",
+      brand: extra?.brand || "Generic",
+      barcode: extra?.barcode || "",
+      enabled: true,
+      stockQuantity: "0.00"
+    };
+
+    if (demoMode) {
+      const newProduct: Product = {
+        id: `custom-${Date.now()}`,
+        sku: `CUSTOM-${Date.now().toString().slice(-6)}`,
+        ...fullPayload
+      } as any;
+      setProducts(prev => [newProduct, ...prev]);
+      starterProducts.unshift(newProduct);
+      addToCart(newProduct, "1");
+      setView("billing");
+      setActiveTask("credit");
+      setBusy(false);
+      setStatus(`Created product "${name}" and added to cart.`);
+      return;
+    }
+    try {
+      const created = await createProduct(fullPayload);
+      setProducts(prev => [created, ...prev]);
+      addToCart(created, "1");
+      setView("billing");
+      setActiveTask("credit");
+      setStatus(`Created product "${name}" and added to cart.`);
+    } catch (e) {
+      const newProduct: Product = {
+        id: `custom-${Date.now()}`,
+        sku: `CUSTOM-${Date.now().toString().slice(-6)}`,
+        ...fullPayload
+      } as any;
+      setProducts(prev => [newProduct, ...prev]);
+      starterProducts.unshift(newProduct);
+      addToCart(newProduct, "1");
+      setView("billing");
+      setActiveTask("credit");
+      setDemoMode(true);
+      setStatus(`Created product "${name}" and added to cart (local).`);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function learnAlias(category: "CUSTOMER" | "PRODUCT", canonicalId: string, aliasValue: string) {
@@ -992,7 +1097,9 @@ function RuralRetailOS() {
             onAddToCart={addToCart}
             onRemoveFromCart={removeFromCart}
             onClearCart={clearCart}
-            onAddCustomProduct={handleAddCustomProduct}
+            onAddCustomProduct={addCustomProductToStore}
+            onEditProduct={editProductPriceAndStock}
+            onToggleProduct={toggleProductActive}
             language={language}
           />
         </section>
@@ -1154,6 +1261,8 @@ function CustomerWorkspace(props: {
   onRemoveFromCart: (productId: string) => void;
   onClearCart: () => void;
   onAddCustomProduct: (name: string, price: number) => void;
+  onEditProduct: (productId: string, sellingPrice: string, stockQuantity: string, purchasePrice?: string, mrp?: string) => void;
+  onToggleProduct: (productId: string, enabled: boolean) => void;
 }) {
   const { customer, customers, activeTask, onTask, view } = props;
   return (
@@ -1163,7 +1272,7 @@ function CustomerWorkspace(props: {
       ) : view === "customers" ? (
         <CustomerDirectory customers={customers} onOpenCustomer={props.onOpenCustomer} copy={props.copy} />
       ) : view === "products" ? (
-        <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} onAddCustomProduct={props.onAddCustomProduct} />
+        <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} onAddCustomProduct={props.onAddCustomProduct} onEditProduct={props.onEditProduct} onToggleProduct={props.onToggleProduct} />
       ) : view === "ai" && !customer ? (
         <AdminInsights customers={customers} products={props.products} language={props.language} transcript={props.transcript} copy={props.copy} />
       ) : !customer ? (
@@ -1210,7 +1319,7 @@ function CustomerWorkspace(props: {
           )}
 
           <div className="rounded-md border border-leaf-100 bg-[#fbfcf8] p-4">
-            {activeTask === "products" && <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} onAddCustomProduct={props.onAddCustomProduct} />}
+            {activeTask === "products" && <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} onAddCustomProduct={props.onAddCustomProduct} onEditProduct={props.onEditProduct} onToggleProduct={props.onToggleProduct} />}
             {activeTask === "credit" && (
               <CreditPanel
                 product={props.selectedProduct}
@@ -1412,7 +1521,6 @@ function AdminInsights({
           )}
         </div>
       </div>
-
       <div className="rounded-md border-2 border-leaf-600 bg-[#f7fbf2] p-5 shadow-soft">
         <h3 className="flex items-center gap-2 text-xl font-black text-leaf-900">
           <Sparkles className="h-5 w-5 text-leaf-600 animate-pulse" aria-hidden />
@@ -1451,7 +1559,9 @@ function ProductSearchPanel({
   busy,
   copy,
   language,
-  onAddCustomProduct
+  onAddCustomProduct,
+  onEditProduct,
+  onToggleProduct
 }: {
   products: Product[];
   onSearch: (event: FormEvent<HTMLFormElement>) => void;
@@ -1459,24 +1569,78 @@ function ProductSearchPanel({
   busy: boolean;
   copy: ReturnType<typeof t>;
   language: Language;
-  onAddCustomProduct: (name: string, price: number) => void;
+  onAddCustomProduct: (name: string, price: number, extra?: any) => void;
+  onEditProduct: (productId: string, sellingPrice: string, stockQuantity: string, purchasePrice?: string, mrp?: string) => void;
+  onToggleProduct: (productId: string, enabled: boolean) => void;
 }) {
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  
+  const [editSellingPrice, setEditSellingPrice] = useState("");
+  const [editStockQuantity, setEditStockQuantity] = useState("");
+  const [editPurchasePrice, setEditPurchasePrice] = useState("");
+  const [editMrp, setEditMrp] = useState("");
+  
+  const [showAddForm, setShowAddForm] = useState(false);
   const [customName, setCustomName] = useState("");
   const [customPrice, setCustomPrice] = useState("30.00");
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [customCategory, setCustomCategory] = useState("Staples");
+  const [customBrand, setCustomBrand] = useState("Generic");
+  const [customUnit, setCustomUnit] = useState("kg");
+  const [customBarcode, setCustomBarcode] = useState("");
+
+  const categoriesList = ["All", "Staples", "Dairy", "Spices", "Snacks", "Beverages", "Personal Care", "Household Care", "Vegetables"];
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case "Staples": return "🌾";
+      case "Dairy": return "🥛";
+      case "Spices": return "🌶️";
+      case "Snacks": return "🍪";
+      case "Beverages": return "☕";
+      case "Personal Care": return "🧼";
+      case "Household Care": return "🧹";
+      case "Vegetables": return "🥦";
+      default: return "📦";
+    }
+  };
+
+  const filteredProducts = useMemo(() => {
+    if (selectedCategory === "All") return products;
+    return products.filter(p => p.category === selectedCategory);
+  }, [products, selectedCategory]);
 
   return (
     <div>
       <h3 className="text-2xl font-black">{copy.productSearch}</h3>
+      
       <form onSubmit={onSearch} className="mt-3 flex min-h-14 items-center rounded-md border border-leaf-100 bg-white px-3">
         <Search className="h-5 w-5 text-leaf-700" aria-hidden />
-        <input name="query" className="ml-2 w-full bg-transparent text-lg font-bold outline-none" placeholder={copy.productSearchPlaceholder} />
+        <input name="query" className="ml-2 w-full bg-transparent text-lg font-bold outline-none text-ink" placeholder={copy.productSearchPlaceholder} />
         <button disabled={busy} className="rounded-md bg-leaf-600 px-4 py-2 font-black text-white disabled:opacity-60">{copy.search}</button>
       </form>
 
-      {products.length === 0 ? (
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {categoriesList.map(cat => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => setSelectedCategory(cat)}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black transition whitespace-nowrap ${
+              selectedCategory === cat 
+                ? "bg-leaf-600 text-white" 
+                : "bg-leaf-50 text-leaf-700 hover:bg-leaf-100"
+            }`}
+          >
+            <span>{getCategoryIcon(cat)}</span>
+            <span>{cat}</span>
+          </button>
+        ))}
+      </div>
+
+      {filteredProducts.length === 0 ? (
         <div className="mt-4 p-4 rounded-md border border-dashed border-leaf-200 bg-white text-center">
-          <p className="text-sm font-bold text-ink/60">No products found matching your search.</p>
+          <p className="text-sm font-bold text-ink/60">No products found matching selection.</p>
           {!showAddForm ? (
             <button
               type="button"
@@ -1490,31 +1654,81 @@ function ProductSearchPanel({
               onSubmit={(e) => {
                 e.preventDefault();
                 if (customName) {
-                  onAddCustomProduct(customName, Number(customPrice || 0));
+                  onAddCustomProduct(customName, Number(customPrice || 0), {
+                    category: customCategory,
+                    brand: customBrand,
+                    unit: customUnit,
+                    barcode: customBarcode
+                  });
                   setShowAddForm(false);
                   setCustomName("");
                 }
               }}
-              className="mt-3 grid gap-2 text-left"
+              className="mt-3 grid gap-3 text-left max-w-md mx-auto bg-leaf-50/50 p-4 rounded-md border border-leaf-100"
             >
-              <label className="text-xs font-bold text-ink/75">Product Name</label>
-              <input
-                required
-                value={customName}
-                onChange={(e) => setCustomName(e.target.value)}
-                className="rounded border border-leaf-200 bg-leaf-50 p-2 text-sm font-bold outline-none text-ink"
-                placeholder="e.g. Eggs 1 Dozen"
-              />
-              <label className="text-xs font-bold text-ink/75">Price (Rs.)</label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={customPrice}
-                onChange={(e) => setCustomPrice(e.target.value)}
-                className="rounded border border-leaf-200 bg-leaf-50 p-2 text-sm font-bold outline-none text-ink"
-                placeholder="Price"
-              />
+              <h4 className="font-black text-leaf-800">Add New Grocery Product</h4>
+              <div>
+                <label className="text-xs font-bold text-ink/75">Product Name</label>
+                <input
+                  required
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  className="w-full rounded border border-leaf-200 bg-white p-2 text-sm font-bold outline-none text-ink mt-1"
+                  placeholder="e.g. Milk 1 Packet"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-ink/75">Selling Price (Rs.)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={customPrice}
+                    onChange={(e) => setCustomPrice(e.target.value)}
+                    className="w-full rounded border border-leaf-200 bg-white p-2 text-sm font-bold outline-none text-ink mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-ink/75">Category</label>
+                  <select
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    className="w-full rounded border border-leaf-200 bg-white p-2 text-sm font-bold outline-none text-ink mt-1"
+                  >
+                    {categoriesList.filter(c => c !== "All").map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-ink/75">Brand Name</label>
+                  <input
+                    value={customBrand}
+                    onChange={(e) => setCustomBrand(e.target.value)}
+                    className="w-full rounded border border-leaf-200 bg-white p-2 text-sm font-bold outline-none text-ink mt-1"
+                    placeholder="Generic"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-ink/75">Unit</label>
+                  <input
+                    value={customUnit}
+                    onChange={(e) => setCustomUnit(e.target.value)}
+                    className="w-full rounded border border-leaf-200 bg-white p-2 text-sm font-bold outline-none text-ink mt-1"
+                    placeholder="kg, packet, L, etc."
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-ink/75">Barcode (Optional)</label>
+                <input
+                  value={customBarcode}
+                  onChange={(e) => setCustomBarcode(e.target.value)}
+                  className="w-full rounded border border-leaf-200 bg-white p-2 text-sm font-bold outline-none text-ink mt-1"
+                  placeholder="Barcode"
+                />
+              </div>
               <div className="flex gap-2 mt-2">
                 <button className="rounded bg-leaf-600 px-4 py-2 text-xs font-black text-white hover:bg-leaf-700 transition">
                   Create Product
@@ -1531,13 +1745,165 @@ function ProductSearchPanel({
           )}
         </div>
       ) : (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {products.map((product) => (
-            <button key={product.id} type="button" onClick={() => onSelect(product)} className="rounded-md border border-leaf-100 bg-white p-3 text-left shadow-sm hover:border-leaf-600">
-              <p className="font-black">{getProductName(product, language)}</p>
-              <p className="text-sm font-bold text-ink/60">Rs.{product.sellingPrice}</p>
-            </button>
-          ))}
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {filteredProducts.map((p) => {
+            const isEditing = editingProductId === p.id;
+            const isEnabled = p.enabled !== false;
+            
+            return (
+              <div 
+                key={p.id} 
+                className={`rounded-md border p-3 flex flex-col justify-between transition bg-white shadow-soft ${
+                  isEnabled ? "border-leaf-100 hover:border-leaf-300" : "border-gray-200 opacity-60 bg-gray-50/30"
+                }`}
+              >
+                <div>
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-xl" title={p.category}>{getCategoryIcon(p.category)}</span>
+                    <span className="rounded-full bg-leaf-50 px-2 py-0.5 text-[10px] font-black text-leaf-800 uppercase">
+                      {p.brand || "Generic"}
+                    </span>
+                  </div>
+                  <h4 className="mt-1 font-black text-ink text-sm sm:text-base leading-tight">
+                    {getProductName(p, language)}
+                  </h4>
+                  <p className="text-xs font-bold text-ink/50 mt-0.5">
+                    SKU: {p.sku} | Unit: {p.unit}
+                  </p>
+                  
+                  <div className="mt-2 grid grid-cols-2 gap-1 bg-leaf-50/30 p-2 rounded text-xs border border-leaf-50">
+                    <div>
+                      <span className="text-ink/60 font-semibold">Sell Price:</span>{" "}
+                      <span className="font-black text-leaf-800">Rs.{p.sellingPrice}</span>
+                    </div>
+                    <div>
+                      <span className="text-ink/60 font-semibold">Stock:</span>{" "}
+                      <span className="font-black text-ink">{p.stockQuantity || "0.00"} {p.unit}</span>
+                    </div>
+                    {p.mrp && (
+                      <div>
+                        <span className="text-ink/60 font-semibold">MRP:</span>{" "}
+                        <span className="font-bold line-through text-red-700">Rs.{p.mrp}</span>
+                      </div>
+                    )}
+                    {p.purchasePrice && (
+                      <div>
+                        <span className="text-ink/60 font-semibold">Cost:</span>{" "}
+                        <span className="font-bold text-ink/80">Rs.{p.purchasePrice}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {isEditing ? (
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      onEditProduct(p.id, editSellingPrice, editStockQuantity, editPurchasePrice, editMrp);
+                      setEditingProductId(null);
+                    }}
+                    className="mt-3 pt-3 border-t border-leaf-100 space-y-2 text-left"
+                  >
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-ink/60 uppercase">Selling Price</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={editSellingPrice}
+                          onChange={(e) => setEditSellingPrice(e.target.value)}
+                          className="w-full rounded border border-leaf-200 bg-white p-1 text-xs font-bold outline-none text-ink mt-0.5"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-ink/60 uppercase">Stock ({p.unit})</label>
+                        <input
+                          type="number"
+                          step="0.001"
+                          required
+                          value={editStockQuantity}
+                          onChange={(e) => setEditStockQuantity(e.target.value)}
+                          className="w-full rounded border border-leaf-200 bg-white p-1 text-xs font-bold outline-none text-ink mt-0.5"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-ink/60 uppercase">Purchase Cost</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editPurchasePrice}
+                          onChange={(e) => setEditPurchasePrice(e.target.value)}
+                          className="w-full rounded border border-leaf-200 bg-white p-1 text-xs font-bold outline-none text-ink mt-0.5"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-ink/60 uppercase">MRP Price</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editMrp}
+                          onChange={(e) => setEditMrp(e.target.value)}
+                          className="w-full rounded border border-leaf-200 bg-white p-1 text-xs font-bold outline-none text-ink mt-0.5"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1.5">
+                      <button className="rounded bg-leaf-600 px-3 py-1.5 text-xs font-black text-white hover:bg-leaf-700 transition flex-1">
+                        Save
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setEditingProductId(null)}
+                        className="rounded bg-leaf-100 px-3 py-1.5 text-xs font-black text-leaf-700 hover:bg-leaf-200 transition flex-1"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="mt-3 flex gap-2 pt-3 border-t border-leaf-50">
+                    <button
+                      type="button"
+                      onClick={() => onSelect(p)}
+                      disabled={!isEnabled}
+                      className="flex-1 rounded-md bg-leaf-600 px-3 py-1.5 text-xs font-black text-white hover:bg-leaf-700 transition disabled:opacity-50"
+                    >
+                      Add to Cart
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingProductId(p.id);
+                        setEditSellingPrice(p.sellingPrice);
+                        setEditStockQuantity(p.stockQuantity || "0.00");
+                        setEditPurchasePrice(p.purchasePrice || "0.00");
+                        setEditMrp(p.mrp || "0.00");
+                      }}
+                      className="rounded-md border border-leaf-200 bg-white px-2 py-1.5 text-xs font-bold text-leaf-700 hover:bg-leaf-50 transition"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onToggleProduct(p.id, !isEnabled)}
+                      className={`rounded-md px-2 py-1.5 text-xs font-black transition ${
+                        isEnabled 
+                          ? "bg-red-50 text-red-700 hover:bg-red-100" 
+                          : "bg-green-50 text-green-700 hover:bg-green-100"
+                      }`}
+                    >
+                      {isEnabled ? "Disable" : "Enable"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
