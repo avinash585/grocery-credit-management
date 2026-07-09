@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { FloatingMic } from "@/components/floating-mic";
+import { notifyCreditSale, notifyPaymentReceived } from "@/lib/whatsapp";
 import {
   Customer,
   Product,
@@ -672,6 +673,20 @@ function RuralRetailOS() {
       setVoiceQuantity("1");
       setPendingVoiceCommand(null);
       setStatus(`Demo credit sale saved: Rs.${total.toFixed(2)}.`);
+      // 📲 WhatsApp notification
+      if (selectedCustomer?.phone) {
+        const firstItem = itemsToSave[0];
+        notifyCreditSale({
+          phone: selectedCustomer.phone,
+          customerName: selectedCustomer.name,
+          productName: firstItem ? getProductName(firstItem.product, language) : "items",
+          quantity: firstItem ? firstItem.quantity : String(itemsToSave.length),
+          amount: total,
+          balance: Math.max(0, Number(selectedCustomer.outstandingBalance ?? 0) + total),
+          shopName: process.env.NEXT_PUBLIC_SHOP_NAME ?? "GramMart Store",
+          language,
+        }).catch(() => {});
+      }
       setBusy(false);
       return;
     }
@@ -723,6 +738,17 @@ function RuralRetailOS() {
       setVoiceAmount("");
       setPendingVoiceCommand(null);
       setStatus(`Demo payment recorded: Rs.${amount.toFixed(2)}.`);
+      // 📲 WhatsApp notification
+      if (selectedCustomer?.phone) {
+        notifyPaymentReceived({
+          phone: selectedCustomer.phone,
+          customerName: selectedCustomer.name,
+          amount,
+          balance: Math.max(0, Number(selectedCustomer.outstandingBalance ?? 0) - amount),
+          shopName: process.env.NEXT_PUBLIC_SHOP_NAME ?? "GramMart Store",
+          language,
+        }).catch(() => {});
+      }
       setBusy(false);
       return;
     }
