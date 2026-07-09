@@ -883,6 +883,102 @@ function RuralRetailOS() {
     };
   }
 
+  // ─── Phonetic skeleton: strip vowels + normalize common sound groups ─────
+  function phoneticKey(s: string) {
+    return s.toLowerCase()
+      .replace(/[aeiouáéíóúāēīōū]/g, "")   // strip vowels
+      .replace(/sh|ch/g, "s")
+      .replace(/ph/g, "f")
+      .replace(/ck|kk/g, "k")
+      .replace(/tt|dd/g, "t")
+      .replace(/[^a-z]/g, "")              // keep only ascii letters
+      .trim();
+  }
+
+  // ─── Tamil script → romanized phonetic map for common name sounds ─────────
+  const TAMIL_ROMAN: [string, string][] = [
+    ["லட்சுமி","lakshmi"],["லக்ஷ்மி","lakshmi"],["ராஜேஷ்","rajesh"],
+    ["ரவி","ravi"],["அவினாஷ்","avinash"],["அவினாஷ","avinash"],
+    ["சுரேஷ்","suresh"],["மகேஷ்","mahesh"],["ரமேஷ்","ramesh"],
+    ["முருகன்","murugan"],["கார்த்திக்","karthik"],["கணேஷ்","ganesh"],
+    ["விஜய்","vijay"],["அஜய்","ajay"],["சஞ்சய்","sanjay"],
+    ["பிரியா","priya"],["கவிதா","kavitha"],["சவிதா","savitha"],
+    ["அனிதா","anitha"],["மீனா","meena"],["கீதா","geetha"],
+    ["சரிதா","saritha"],["லலிதா","lalitha"],["மாலா","mala"],
+    ["சுந்தர்","sundar"],["வேலு","velu"],["பாண்டி","pandi"],
+    ["செல்வம்","selvam"],["குமார்","kumar"],["பாலு","balu"],
+    ["ரஞ்சித்","ranjith"],["திலீப்","dileep"],["சதீஷ்","satish"],
+    ["அப்துல்","abdul"],["ஹுசேன்","hussain"],["இப்ராஹிம்","ibrahim"],
+    ["ஜான்","john"],["மேரி","mary"],["ஜோஸஃப்","joseph"],
+  ];
+
+  // ─── Find customer with 4-layer fuzzy matching ────────────────────────────
+  function findCustomerFuzzy(voiceName: string): Customer | undefined {
+    if (!voiceName) return undefined;
+    const query = voiceName.trim();
+    const qLower = query.toLowerCase();
+
+    // Layer 1: exact match (case-insensitive)
+    let found = customers.find(c => c.name.toLowerCase() === qLower);
+    if (found) return found;
+
+    // Layer 2: partial includes (both ways)
+    found = customers.find(c =>
+      c.name.toLowerCase().includes(qLower) ||
+      qLower.includes(c.name.toLowerCase())
+    );
+    if (found) return found;
+
+    // Layer 3: Tamil script → romanized → match
+    let romanized = qLower;
+    for (const [ta, en] of TAMIL_ROMAN) {
+      if (qLower.includes(ta.toLowerCase())) {
+        romanized = qLower.replace(ta.toLowerCase(), en);
+        break;
+      }
+    }
+    if (romanized !== qLower) {
+      found = customers.find(c =>
+        c.name.toLowerCase().includes(romanized) ||
+        romanized.includes(c.name.toLowerCase())
+      );
+      if (found) return found;
+    }
+
+    // Layer 4: phonetic skeleton similarity
+    const qKey = phoneticKey(query);
+    if (qKey.length >= 2) {
+      // Find best phonetic match
+      let best: Customer | undefined;
+      let bestScore = 999;
+      for (const c of customers) {
+        const cKey = phoneticKey(c.name);
+        // Levenshtein distance on phonetic keys
+        const dist = levenshtein(qKey, cKey);
+        const threshold = Math.max(2, Math.floor(cKey.length * 0.4));
+        if (dist < bestScore && dist <= threshold) {
+          bestScore = dist;
+          best = c;
+        }
+      }
+      if (best) return best;
+    }
+
+    return undefined;
+  }
+
+  function levenshtein(a: string, b: string): number {
+    const dp: number[][] = Array.from({ length: a.length + 1 }, (_, i) =>
+      Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+    );
+    for (let i = 1; i <= a.length; i++)
+      for (let j = 1; j <= b.length; j++)
+        dp[i][j] = a[i-1] === b[j-1]
+          ? dp[i-1][j-1]
+          : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    return dp[a.length][b.length];
+  }
+
   async function executeDirectCommand(cmd: {
     intent: string;
     customerName?: string;
@@ -892,90 +988,87 @@ function RuralRetailOS() {
   }) {
     if (!cmd || !cmd.intent) return;
     const intent = cmd.intent.toUpperCase();
-    if (intent === "OPEN_CUSTOMER" || intent === "ASK_BALANCE" || intent === "SEND_REMINDER") {
-      if (cmd.customerName) {
-        const query = cmd.customerName.toLowerCase().trim();
-        const matched = customers.find(c => c.name.toLowerCase().includes(query) || (c.phone && c.phone.includes(query)));
-        if (matched) {
-          openCustomer(matched);
-          if (intent === "ASK_BALANCE") {
-            setActiveTask("ai");
-            setStatus(`${matched.name}'s balance is Rs.${matched.outstandingBalance}.`);
-          } else if (intent === "SEND_REMINDER") {
-            setStatus(`SMS reminder prepared for ${matched.name}.`);
-          } else {
-            setStatus(`Opened customer account for ${matched.name}.`);
-          }
-        }
+
+    // ── Helper: find & open customer ──────────────────────────────────────
+    const resolveCustomer = (name?: string): Customer | null => {
+      if (!name) return selectedCustomer ?? null;
+      const found = findCustomerFuzzy(name);
+      if (found) { openCustomer(found); return found; }
+      setStatus(`❌ Customer "${name}" not found. Please check the name.`);
+      return null;
+    };
+
+    // ── Helper: find product ──────────────────────────────────────────────
+    const resolveProduct = (alias?: string) => {
+      if (!alias) return selectedProduct ?? null;
+      const a = alias.toLowerCase().trim();
+      const p = products.find(p =>
+        p.name.toLowerCase().includes(a) ||
+        a.includes(p.name.toLowerCase()) ||
+        p.sku.toLowerCase().includes(a)
+      );
+      if (p) { setSelectedProduct(p); return p; }
+      return null;
+    };
+
+    if (intent === "OPEN_CUSTOMER" || intent === "ASK_BALANCE") {
+      const cust = resolveCustomer(cmd.customerName);
+      if (!cust) return;
+      if (intent === "ASK_BALANCE") {
+        setActiveTask("ai");
+        setStatus(`${cust.name}'s balance: ₹${cust.outstandingBalance ?? 0}.`);
+      } else {
+        setStatus(`✅ Opened account: ${cust.name}`);
       }
+
     } else if (intent === "ADD_PURCHASE") {
-      let currentCust = selectedCustomer;
-      if (cmd.customerName) {
-        const query = cmd.customerName.toLowerCase().trim();
-        const matched = customers.find(c => c.name.toLowerCase().includes(query));
-        if (matched) {
-          openCustomer(matched);
-          currentCust = matched;
-        }
+      // ── Step 1: open customer account ──────────────────────────────────
+      const cust = resolveCustomer(cmd.customerName);
+      if (!cust) return;
+
+      // ── Step 2: find product ────────────────────────────────────────────
+      const prod = resolveProduct(cmd.productAlias);
+      if (!prod) {
+        setStatus(`❌ Product "${cmd.productAlias ?? ""}" not found in catalog.`);
+        return;
       }
-      if (!currentCust) return;
-      
-      let matchedProd = selectedProduct;
-      if (cmd.productAlias) {
-        const alias = cmd.productAlias.toLowerCase().trim();
-        const matchedProduct = products.find(p => p.name.toLowerCase().includes(alias) || p.sku.toLowerCase().includes(alias));
-        if (matchedProduct) {
-          setSelectedProduct(matchedProduct);
-          matchedProd = matchedProduct;
-        }
-      }
-      if (!matchedProd) return;
-      
-      let qty = "1";
-      if (cmd.quantity) {
-        const match = cmd.quantity.match(/\d+(\.\d+)?/);
-        qty = match ? match[0] : "1";
-      }
-      
+
+      // ── Step 3: parse quantity ──────────────────────────────────────────
+      const qtyStr = (cmd.quantity ?? "1").match(/\d+(\.\d+)?/)?.[0] ?? "1";
+
+      // ── Step 4: switch to billing view and save credit ──────────────────
       setView("billing");
       setActiveTask("credit");
       setBusy(true);
-      setStatus(`Directly executing: credit sale of ${qty} ${matchedProd.name} for ${currentCust.name}...`);
+      setStatus(`⏳ Adding ${qtyStr} ${prod.name} → ${cust.name}'s account…`);
       try {
-        await executeSaveCredit(matchedProd, qty);
-        setStatus(`Successfully added ${qty} ${matchedProd.name} to ${currentCust.name}'s account.`);
-      } catch (e) {
-        setStatus("Direct save credit failed.");
+        await executeSaveCredit(prod, qtyStr);
+        setStatus(`✅ ${qtyStr} ${prod.name} added to ${cust.name}'s account!`);
+      } catch {
+        setStatus("❌ Could not save credit. Please try again.");
       } finally {
         setBusy(false);
       }
+
     } else if (intent === "RECEIVE_PAYMENT") {
-      let currentCust = selectedCustomer;
-      if (cmd.customerName) {
-        const query = cmd.customerName.toLowerCase().trim();
-        const matched = customers.find(c => c.name.toLowerCase().includes(query));
-        if (matched) {
-          openCustomer(matched);
-          currentCust = matched;
-        }
+      const cust = resolveCustomer(cmd.customerName);
+      if (!cust) return;
+
+      const amt = Number(cmd.amount ?? "0");
+      if (amt <= 0) {
+        setStatus("❌ Could not understand payment amount. Please retry.");
+        return;
       }
-      if (!currentCust) return;
-      
-      let amt = 0;
-      if (cmd.amount) {
-        amt = Number(cmd.amount);
-      }
-      if (amt <= 0) return;
-      
+
       setView("billing");
       setActiveTask("payment");
       setBusy(true);
-      setStatus(`Directly executing: receiving payment of Rs.${amt} from ${currentCust.name}...`);
+      setStatus(`⏳ Recording ₹${amt} payment from ${cust.name}…`);
       try {
         await executeSavePayment(amt);
-        setStatus(`Successfully received payment of Rs.${amt} from ${currentCust.name}.`);
-      } catch (e) {
-        setStatus("Direct save payment failed.");
+        setStatus(`✅ ₹${amt} payment received from ${cust.name}!`);
+      } catch {
+        setStatus("❌ Could not save payment. Please try again.");
       } finally {
         setBusy(false);
       }
