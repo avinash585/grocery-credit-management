@@ -1379,10 +1379,18 @@ function RuralRetailOS() {
 
       <FloatingMic language={language} copy={copy} onTranscript={(value) => {
         setTranscript(value);
-        if (value) {
-          setStatus(value);
+        if (value) setStatus(value);
+      }} onCommandParsed={async (cmd) => {
+        if (!cmd || !cmd.intent) return;
+        setTranscript(cmd.intent);
+        // Always try direct execution first (auto-completes compound commands)
+        try {
+          await executeDirectCommand(cmd);
+        } catch {
+          // Fallback to guided mode
+          handleVoiceCommand(cmd);
         }
-      }} onCommandParsed={handleVoiceCommand} />
+      }} />
     </main>
   );
 }
