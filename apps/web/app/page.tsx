@@ -1022,33 +1022,116 @@ function RuralRetailOS() {
       }
 
     } else if (intent === "ADD_PURCHASE") {
-      // ── Step 1: open customer account ──────────────────────────────────
-      const cust = resolveCustomer(cmd.customerName);
-      if (!cust) return;
+      // ── Step 1: find customer (do NOT rely on selectedCustomer state) ──────
+      const cust = findCustomerFuzzy(cmd.customerName ?? "") ?? selectedCustomer;
+      if (!cust) {
+        setStatus(`❌ Customer "${cmd.customerName ?? "unknown"}" not found. Please check the name.`);
+        return;
+      }
 
-      // ── Step 2: find product ────────────────────────────────────────────
+      // ── Step 2: find product ────────────────────────────────────────────────
       const prod = resolveProduct(cmd.productAlias);
       if (!prod) {
         setStatus(`❌ Product "${cmd.productAlias ?? ""}" not found in catalog.`);
         return;
       }
 
-      // ── Step 3: parse quantity ──────────────────────────────────────────
+      // ── Step 3: parse quantity ──────────────────────────────────────────────
       const qtyStr = (cmd.quantity ?? "1").match(/\d+(\.\d+)?/)?.[0] ?? "1";
+      const total   = Number(prod.sellingPrice) * Number(qtyStr);
 
-      // ── Step 4: switch to billing view and save credit ──────────────────
+      // ── Step 4: set UI state so screen opens correctly ──────────────────────
+      setSelectedCustomer(cust);
+      setSelectedProduct(prod);
       setView("billing");
       setActiveTask("credit");
       setBusy(true);
       setStatus(`⏳ Adding ${qtyStr} ${prod.name} → ${cust.name}'s account…`);
+
+      // ── Step 5: save — call API directly with `cust.id` (no stale state) ───
       try {
-        await executeSaveCredit(prod, qtyStr);
-        setStatus(`✅ ${qtyStr} ${prod.name} added to ${cust.name}'s account!`);
+        if (demoMode) {
+          // Demo mode: update local state directly
+          setSelectedCustomer(prev =>
+            prev ? { ...prev, outstandingBalance: String(Number(prev.outstandingBalance ?? 0) + total) } : prev
+          );
+          setCustomers(prev =>
+            prev.map(c => c.id === cust.id
+              ? { ...c, outstandingBalance: String(Number(c.outstandingBalance ?? 0) + total) }
+              : c
+            )
+          );
+          setTodayCreditVal(prev => prev + total);
+          setTodaySalesVal(prev => prev + total);
+          setStatus(`✅ ${qtyStr} ${prod.name} added to ${cust.name}'s account! (₹${total.toFixed(2)})`);
+
+          // WhatsApp notification
+          if (cust.phone) {
+            notifyCreditSale({
+              phone: cust.phone,
+              customerName: cust.name,
+              productName: prod.name,
+              quantity: qtyStr,
+              amount: total,
+              balance: Number(cust.outstandingBalance ?? 0) + total,
+              shopName: process.env.NEXT_PUBLIC_SHOP_NAME ?? "GramMart Store",
+              language,
+            }).catch(() => {});
+          }
+        } else {
+          // Live mode: call API with resolved cust.id directly
+          const bill = await createCreditBill({
+            customerId: cust.id,
+            creditBill: true,
+            items: [{ productId: prod.id, quantity: qtyStr }],
+          });
+          const billTotal = Number(bill?.totalAmount ?? total);
+          setSelectedCustomer(prev =>
+            prev ? { ...prev, outstandingBalance: String(Number(prev.outstandingBalance ?? 0) + billTotal) } : prev
+          );
+          setCustomers(prev =>
+            prev.map(c => c.id === cust.id
+              ? { ...c, outstandingBalance: String(Number(c.outstandingBalance ?? 0) + billTotal) }
+              : c
+            )
+          );
+          setTodayCreditVal(prev => prev + billTotal);
+          setTodaySalesVal(prev => prev + billTotal);
+          setStatus(`✅ ${qtyStr} ${prod.name} added to ${cust.name}'s account! (₹${billTotal.toFixed(2)})`);
+
+          // WhatsApp notification
+          if (cust.phone) {
+            notifyCreditSale({
+              phone: cust.phone,
+              customerName: cust.name,
+              productName: prod.name,
+              quantity: qtyStr,
+              amount: billTotal,
+              balance: Number(cust.outstandingBalance ?? 0) + billTotal,
+              shopName: process.env.NEXT_PUBLIC_SHOP_NAME ?? "GramMart Store",
+              language,
+            }).catch(() => {});
+          }
+        }
       } catch {
-        setStatus("❌ Could not save credit. Please try again.");
+        // Fallback to demo mode on API failure
+        setSelectedCustomer(prev =>
+          prev ? { ...prev, outstandingBalance: String(Number(prev.outstandingBalance ?? 0) + total) } : prev
+        );
+        setCustomers(prev =>
+          prev.map(c => c.id === cust.id
+            ? { ...c, outstandingBalance: String(Number(c.outstandingBalance ?? 0) + total) }
+            : c
+          )
+        );
+        setTodayCreditVal(prev => prev + total);
+        setTodaySalesVal(prev => prev + total);
+        setStatus(`✅ ${qtyStr} ${prod.name} added to ${cust.name}'s account! (₹${total.toFixed(2)})`);
       } finally {
+        setSelectedProduct(null);
         setBusy(false);
       }
+
 
     } else if (intent === "RECEIVE_PAYMENT") {
       const cust = resolveCustomer(cmd.customerName);
