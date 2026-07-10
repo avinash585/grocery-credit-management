@@ -31,6 +31,7 @@ type ParsedCommand = {
   productAlias?: string;
   amount?: string;
   quantity?: string;
+  rawText?: string;
 };
 
 // ─── BCP-47 language codes ────────────────────────────────────────────────────
@@ -229,7 +230,7 @@ function parseCommand(text: string, language: Language): ParsedCommand {
   // Compound command: open account + product mentioned → ADD_PURCHASE
   if ((has(INTENTS.open) || has(INTENTS.add)) && productAlias) intent = "ADD_PURCHASE";
 
-  return { intent, customerName, productAlias, amount, quantity };
+  return { intent, customerName, productAlias, amount, quantity, rawText: text };
 }
 
 function speak(text: string, langCode: string) {
@@ -366,7 +367,7 @@ export function FloatingMic({
     if (!parsedCmd) return;
     setPhase("executing");
     if (onCommandParsed) {
-      try { await (onCommandParsed(parsedCmd) as unknown as Promise<void>); }
+      try { await (onCommandParsed({ ...parsedCmd, rawText: finalText }) as unknown as Promise<void>); }
       catch { /* parent handles errors */ }
     }
     setPhase("done");

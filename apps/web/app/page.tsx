@@ -33,6 +33,7 @@ import {
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { FloatingMic } from "@/components/floating-mic";
 import { notifyCreditSale, notifyPaymentReceived } from "@/lib/whatsapp";
+import { getDisplayName } from "@/lib/transliterate";
 import {
   Customer,
   Product,
@@ -217,6 +218,25 @@ const starterProducts: Product[] = [
 
 ];
 
+const voiceEssentialProducts: Product[] = [
+  {
+    id: "demo-milk-1",
+    sku: "DAIRY-001",
+    name: "Milk",
+    sellingPrice: "60.00",
+    category: "Dairy",
+    unit: "1 L",
+    enabled: true,
+    stockQuantity: "100.00",
+    nameTa: "பால்",
+    nameHi: "दूध",
+    nameTe: "పాలు",
+    nameKn: "ಹಾಲು",
+    nameMl: "പാൽ",
+    aliases: "milk,paal,doodh,amul milk,aavin milk,nandini milk"
+  }
+];
+
 export default function Home() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -235,7 +255,13 @@ function RuralRetailOS() {
   const [view, setView] = useState<View>("admin");
   const [customers, setCustomers] = useState<Customer[]>(starterCustomers);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [products, setProducts] = useState<Product[]>(starterProducts);
+  const [products, setProducts] = useState<Product[]>(() => {
+    const existingSkus = new Set(starterProducts.map((product) => product.sku));
+    return [
+      ...voiceEssentialProducts.filter((product) => !existingSkus.has(product.sku)),
+      ...starterProducts
+    ];
+  });
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeTask, setActiveTask] = useState<Task>("credit");
   const [voiceQuantity, setVoiceQuantity] = useState("1");
@@ -805,8 +831,101 @@ function RuralRetailOS() {
     });
   }
 
+  function normalizeVoiceText(text: string) {
+    return text.toLowerCase().trim().replace(/[.,!?_\-]/g, " ").replace(/\s+/g, " ");
+  }
+
+  function productSearchText(product: Product, lang: Language) {
+    return [
+      product.name,
+      getProductName(product, lang),
+      product.sku,
+      product.category,
+      product.brand,
+      product.unit,
+      product.aliases
+    ].filter(Boolean).join(" ").toLowerCase();
+  }
+
+  function canonicalProductAlias(text: string) {
+    const normalized = normalizeVoiceText(text);
+    const aliases: Array<[string[], string]> = [
+      [["milk", "paal", "doodh", "amul", "aavin", "nandini"], "milk"],
+      [["rice", "arisi", "chawal", "ponni", "basmati"], "rice"],
+      [["sugar", "sakkarai", "chini", "cheeni"], "sugar"],
+      [["oil", "sunflower", "groundnut", "coconut oil"], "oil"],
+      [["dal", "paruppu", "toor", "moong", "chana"], "dal"]
+    ];
+    for (const [keys, alias] of aliases) {
+      if (keys.some((key) => normalized.includes(key))) return alias;
+    }
+    return normalized;
+  }
+
+  function resolveProductFromVoice(alias: string | undefined, fullText: string, lang: Language) {
+    const searchText = canonicalProductAlias(`${alias ?? ""} ${fullText}`);
+    const words = searchText.split(/\s+/).filter((part) => part.length > 2);
+    const candidates = products
+      .filter((product) => {
+        const haystack = productSearchText(product, lang);
+        return haystack.includes(searchText) || words.some((part) => haystack.includes(part));
+      })
+      .sort((a, b) => {
+        const aExact = productSearchText(a, lang).split(/\s+/).includes(searchText) ? 0 : 1;
+        const bExact = productSearchText(b, lang).split(/\s+/).includes(searchText) ? 0 : 1;
+        return aExact - bExact || a.name.length - b.name.length;
+      });
+    return candidates[0] ?? null;
+  }
+
+  function extractVoiceCustomerName(normalized: string) {
+    for (const c of customers) {
+      if (normalized.includes(c.name.toLowerCase())) return c.name;
+      const firstName = c.name.toLowerCase().split(/\s+/)[0];
+      if (firstName.length > 2 && normalized.includes(firstName)) return c.name;
+    }
+
+    const patterns = [
+      /\b(?:to|for|into|in|on)\s+([a-z][a-z\s]{1,40}?)\s+(?:account|khata|book)\b/,
+      /\b([a-z][a-z\s]{1,40}?)\s+(?:account|khata)\b/,
+      /\b(?:open|show)\s+([a-z][a-z\s]{1,40}?)\s+(?:account|khata)?\b/
+    ];
+    for (const pattern of patterns) {
+      const match = normalized.match(pattern);
+      if (match?.[1]) {
+        const cleaned = match[1]
+          .replace(/\b(add|credit|sale|purchase|payment|paid|receive|received|rupees?|rs|milk|rice|sugar|oil|dal|liters?|litres?|kg|kilo|packet|of)\b/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (cleaned) return cleaned;
+      }
+    }
+    return undefined;
+  }
+
+  function extractVoiceQuantity(normalized: string) {
+    const numberWords: Record<string, string> = {
+      one: "1",
+      two: "2",
+      three: "3",
+      four: "4",
+      five: "5",
+      six: "6",
+      seven: "7",
+      eight: "8",
+      nine: "9",
+      ten: "10"
+    };
+    const numeric = normalized.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilo|kilogram|g|gram|liter|litre|l|ml|packet|pack|piece|pc)?/);
+    if (numeric) return numeric[1];
+    for (const [word, value] of Object.entries(numberWords)) {
+      if (normalized.includes(word)) return value;
+    }
+    return undefined;
+  }
+
   function parseLocalCommand(text: string, lang: Language) {
-    const normalized = text.toLowerCase().trim().replace(/[.,!?_\-]/g, " ");
+    const normalized = normalizeVoiceText(text);
     let intent = "UNKNOWN";
     if (normalized.includes("open") || normalized.includes("account") || normalized.includes("khata") || normalized.includes("खोल") || normalized.includes("திற") || normalized.includes("கணக்கு")) {
       intent = "OPEN_CUSTOMER";
@@ -814,7 +933,8 @@ function RuralRetailOS() {
     if (normalized.includes("paid") || normalized.includes("received") || normalized.includes("payment") || normalized.includes("ரூபாய்") || normalized.includes("பணம்") || normalized.includes("பற்று")) {
       intent = "RECEIVE_PAYMENT";
     }
-    if (normalized.includes("add") || normalized.includes("sugar") || normalized.includes("rice") || normalized.includes("oil") || normalized.includes("dal") || normalized.includes("கடன்") || normalized.includes("சேர்")) {
+    const detectedProduct = resolveProductFromVoice(undefined, normalized, lang);
+    if (normalized.includes("add") || normalized.includes("put") || normalized.includes("give") || normalized.includes("credit") || normalized.includes("sale") || normalized.includes("purchase") || detectedProduct || normalized.includes("sugar") || normalized.includes("rice") || normalized.includes("milk") || normalized.includes("oil") || normalized.includes("dal") || normalized.includes("கடன்") || normalized.includes("சேர்")) {
       if (!normalized.includes("paid") && !normalized.includes("received")) {
         intent = "ADD_PURCHASE";
       }
@@ -829,24 +949,13 @@ function RuralRetailOS() {
       intent = "CANCEL";
     }
 
-    let customerName: string | undefined = undefined;
-    for (const c of customers) {
-      if (normalized.includes(c.name.toLowerCase())) {
-        customerName = c.name;
-        break;
-      }
-    }
+    let customerName: string | undefined = extractVoiceCustomerName(normalized);
 
     let productAlias: string | undefined = undefined;
-    for (const p of products) {
-      const pName = getProductName(p, lang).toLowerCase();
-      if (normalized.includes(pName) || normalized.includes(p.name.toLowerCase())) {
-        productAlias = p.name;
-        break;
-      }
-    }
+    if (detectedProduct) productAlias = detectedProduct.name;
     if (!productAlias) {
-      if (normalized.includes("sugar") || normalized.includes("சர்க்கரை") || normalized.includes("चीनी")) productAlias = "Sugar 1 kg";
+      if (normalized.includes("milk") || normalized.includes("paal") || normalized.includes("doodh")) productAlias = "Milk";
+      else if (normalized.includes("sugar") || normalized.includes("சர்க்கரை") || normalized.includes("चीनी")) productAlias = "Sugar 1 kg";
       else if (normalized.includes("rice") || normalized.includes("அரிசி") || normalized.includes("चावल")) productAlias = "Sona Masoori Rice";
       else if (normalized.includes("oil") || normalized.includes("எண்ணெய்") || normalized.includes("तेल")) productAlias = "Sunflower Oil 1 L";
       else if (normalized.includes("dal") || normalized.includes("பருப்பு") || normalized.includes("दाल")) productAlias = "Toor Dal 1 kg";
@@ -859,10 +968,8 @@ function RuralRetailOS() {
     }
 
     let quantity: string | undefined = undefined;
-    const qtyMatch = normalized.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilo|packet|liter|litre|l)/);
-    if (qtyMatch) {
-      quantity = qtyMatch[1];
-    } else {
+    quantity = extractVoiceQuantity(normalized);
+    if (!quantity) {
       if (normalized.includes("one") || normalized.includes("ஒரு") || normalized.includes("एक") || normalized.includes("1")) quantity = "1";
       else if (normalized.includes("two") || normalized.includes("இரண்டு") || normalized.includes("दो") || normalized.includes("2")) quantity = "2";
       else if (normalized.includes("three") || normalized.includes("மூன்று") || normalized.includes("तीन") || normalized.includes("3")) quantity = "3";
@@ -1001,12 +1108,7 @@ function RuralRetailOS() {
     // ── Helper: find product ──────────────────────────────────────────────
     const resolveProduct = (alias?: string) => {
       if (!alias) return selectedProduct ?? null;
-      const a = alias.toLowerCase().trim();
-      const p = products.find(p =>
-        p.name.toLowerCase().includes(a) ||
-        a.includes(p.name.toLowerCase()) ||
-        p.sku.toLowerCase().includes(a)
-      );
+      const p = resolveProductFromVoice(alias, alias, language);
       if (p) { setSelectedProduct(p); return p; }
       return null;
     };
@@ -1171,7 +1273,7 @@ function RuralRetailOS() {
     if (intent === "OPEN_CUSTOMER" || intent === "ASK_BALANCE" || intent === "SEND_REMINDER") {
       if (cmd.customerName) {
         const query = cmd.customerName.toLowerCase().trim();
-        const matched = customers.find(c => c.name.toLowerCase().includes(query) || (c.phone && c.phone.includes(query)));
+        const matched = findCustomerFuzzy(cmd.customerName) ?? customers.find(c => c.name.toLowerCase().includes(query) || (c.phone && c.phone.includes(query)));
         if (matched) {
           openCustomer(matched);
           if (intent === "ASK_BALANCE") {
@@ -1198,7 +1300,7 @@ function RuralRetailOS() {
       let currentCust = selectedCustomer;
       if (cmd.customerName && (!selectedCustomer || selectedCustomer.name.toLowerCase() !== cmd.customerName.toLowerCase())) {
         const query = cmd.customerName.toLowerCase().trim();
-        const matched = customers.find(c => c.name.toLowerCase().includes(query));
+        const matched = findCustomerFuzzy(cmd.customerName) ?? customers.find(c => c.name.toLowerCase().includes(query));
         if (matched) {
           openCustomer(matched);
           currentCust = matched;
@@ -1215,7 +1317,7 @@ function RuralRetailOS() {
       let matchedProd = selectedProduct;
       if (cmd.productAlias) {
         const alias = cmd.productAlias.toLowerCase().trim();
-        const matchedProduct = products.find(p => p.name.toLowerCase().includes(alias) || p.sku.toLowerCase().includes(alias));
+        const matchedProduct = resolveProductFromVoice(alias, alias, language);
         if (matchedProduct) {
           setSelectedProduct(matchedProduct);
           matchedProd = matchedProduct;
@@ -1243,7 +1345,7 @@ function RuralRetailOS() {
       let currentCust = selectedCustomer;
       if (cmd.customerName && (!selectedCustomer || selectedCustomer.name.toLowerCase() !== cmd.customerName.toLowerCase())) {
         const query = cmd.customerName.toLowerCase().trim();
-        const matched = customers.find(c => c.name.toLowerCase().includes(query));
+        const matched = findCustomerFuzzy(cmd.customerName) ?? customers.find(c => c.name.toLowerCase().includes(query));
         if (matched) {
           openCustomer(matched);
           currentCust = matched;
@@ -1313,7 +1415,7 @@ function RuralRetailOS() {
         let prod = selectedProduct;
         if (!prod && pendingVoiceCommand.productAlias) {
           const alias = pendingVoiceCommand.productAlias.toLowerCase().trim();
-          prod = products.find(p => p.name.toLowerCase().includes(alias) || p.sku.toLowerCase().includes(alias)) || null;
+          prod = resolveProductFromVoice(alias, alias, language);
         }
         if (prod) {
           executeSaveCredit(prod, voiceQuantity);
@@ -1584,13 +1686,17 @@ function RuralRetailOS() {
         if (value) setStatus(value);
       }} onCommandParsed={async (cmd) => {
         if (!cmd || !cmd.intent) return;
-        setTranscript(cmd.intent);
+        const transcriptText = [cmd.customerName, cmd.productAlias, cmd.quantity, cmd.amount, cmd.intent].filter(Boolean).join(" ");
+        const rawText = "rawText" in cmd && typeof cmd.rawText === "string" ? cmd.rawText : "";
+        const enrichedCommand = parseLocalCommand(rawText || transcript || transcriptText, language);
+        const commandToRun = enrichedCommand.intent !== "UNKNOWN" ? enrichedCommand : cmd;
+        setTranscript(rawText || transcript || commandToRun.intent);
         // Always try direct execution first (auto-completes compound commands)
         try {
-          await executeDirectCommand(cmd);
+          await executeDirectCommand(commandToRun);
         } catch {
           // Fallback to guided mode
-          handleVoiceCommand(cmd);
+          handleVoiceCommand(commandToRun);
         }
       }} />
     </main>
@@ -1641,7 +1747,7 @@ function CustomerWorkspace(props: {
       {view === "admin" ? (
         <AdminPanel customers={customers} status={props.status} demoMode={props.demoMode} hasToken={props.hasToken} onView={props.onView} copy={props.copy} merchantUpiId={props.merchantUpiId} onChangeUpiId={props.onChangeUpiId} />
       ) : view === "customers" ? (
-        <CustomerDirectory customers={customers} onOpenCustomer={props.onOpenCustomer} copy={props.copy} />
+        <CustomerDirectory customers={customers} onOpenCustomer={props.onOpenCustomer} copy={props.copy} language={props.language} />
       ) : view === "products" ? (
         <ProductSearchPanel products={props.products} onSearch={props.onProductSearch} onSelect={props.onProductSelect} busy={props.busy} copy={props.copy} language={props.language} onAddCustomProduct={props.onAddCustomProduct} onEditProduct={props.onEditProduct} onToggleProduct={props.onToggleProduct} />
       ) : view === "ai" && !customer ? (
@@ -1654,7 +1760,7 @@ function CustomerWorkspace(props: {
             <p className="mt-3 max-w-xl text-lg font-semibold text-ink/65">{props.copy.openCustomerHint}</p>
           </div>
           <div className="grid gap-3">
-            {customers.slice(0, 5).map((item) => <CustomerCard key={item.id} customer={item} onClick={() => props.onOpenCustomer(item)} />)}
+            {customers.slice(0, 5).map((item) => <CustomerCard key={item.id} customer={item} language={props.language} onClick={() => props.onOpenCustomer(item)} />)}
           </div>
         </div>
       ) : (
@@ -1663,7 +1769,7 @@ function CustomerWorkspace(props: {
             <p className="text-sm font-black uppercase tracking-wide text-white/65">{props.copy.customerAccount}</p>
             <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-4xl font-black">{customer.name}</h2>
+                <h2 className="text-4xl font-black">{getDisplayName(customer.name, props.language)}</h2>
                 <p className="mt-1 text-lg text-white/75">{customer.phone || props.copy.noPhone}</p>
               </div>
               <div className="rounded-md bg-white/10 p-3 text-right">
@@ -1719,7 +1825,7 @@ function CustomerWorkspace(props: {
                 merchantUpiId={props.merchantUpiId}
               />
             )}
-            {(view === "ai" || activeTask === "ai") && <InlineAI customer={customer} transcript={props.transcript} copy={props.copy} />}
+            {(view === "ai" || activeTask === "ai") && <InlineAI customer={customer} transcript={props.transcript} copy={props.copy} language={props.language} />}
           </div>
 
           <div className="rounded-md bg-leaf-50 p-4">
@@ -1790,7 +1896,7 @@ function AdminPanel({
   );
 }
 
-function CustomerDirectory({ customers, onOpenCustomer, copy }: { customers: Customer[]; onOpenCustomer: (customer: Customer) => void; copy: ReturnType<typeof t> }) {
+function CustomerDirectory({ customers, onOpenCustomer, copy, language }: { customers: Customer[]; onOpenCustomer: (customer: Customer) => void; copy: ReturnType<typeof t>; language: Language }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 rounded-md bg-leaf-50 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -1801,7 +1907,7 @@ function CustomerDirectory({ customers, onOpenCustomer, copy }: { customers: Cus
         <p className="rounded-md bg-white px-3 py-2 font-black text-leaf-700">{customers.length} {copy.accounts}</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        {customers.map((customer) => <CustomerCard key={customer.id} customer={customer} onClick={() => onOpenCustomer(customer)} />)}
+        {customers.map((customer) => <CustomerCard key={customer.id} customer={customer} language={language} onClick={() => onOpenCustomer(customer)} />)}
       </div>
     </div>
   );
@@ -2480,12 +2586,12 @@ function PaymentPanel({
   );
 }
 
-function InlineAI({ customer, transcript, copy }: { customer: Customer; transcript: string; copy: ReturnType<typeof t> }) {
+function InlineAI({ customer, transcript, copy, language }: { customer: Customer; transcript: string; copy: ReturnType<typeof t>; language: Language }) {
   return (
     <div>
       <h3 className="flex items-center gap-2 text-2xl font-black"><Sparkles className="h-6 w-6 text-leaf-700" aria-hidden /> {copy.aiHelp}</h3>
       <div className="mt-3 grid gap-2">
-        <AssistantBubble text={`${customer.name} currently has Rs.${customer.outstandingBalance ?? "0"} pending.`} />
+        <AssistantBubble text={`${getDisplayName(customer.name, language)} currently has Rs.${customer.outstandingBalance ?? "0"} pending.`} />
         <AssistantBubble text={transcript ? `Voice: ${transcript}` : copy.askCustomerOwes} />
         <AssistantBubble text={copy.reminderSuggestion} />
       </div>
@@ -2709,10 +2815,10 @@ function VoiceCard({
   );
 }
 
-function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () => void }) {
+function CustomerCard({ customer, onClick, language }: { customer: Customer; onClick: () => void; language: Language }) {
   return (
     <button type="button" onClick={onClick} className="rounded-md bg-white p-3 text-left shadow-sm hover:shadow-soft">
-      <p className="text-lg font-black">{customer.name}</p>
+      <p className="text-lg font-black">{getDisplayName(customer.name, language)}</p>
       <p className="text-sm font-bold text-ink/60">{customer.phone || "No phone"}</p>
       <p className="mt-1 text-sm font-black text-leaf-700">Balance Rs.{customer.outstandingBalance ?? "0"}</p>
     </button>
