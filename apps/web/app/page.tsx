@@ -831,6 +831,14 @@ function RuralRetailOS() {
     });
   }
 
+  function applyResolvedCustomerBalance(customer: Customer, delta: number) {
+    const nextBalance = Math.max(0, Number(customer.outstandingBalance ?? "0") + delta).toFixed(2);
+    const updated = { ...customer, outstandingBalance: nextBalance };
+    setSelectedCustomer(updated);
+    setCustomers((existing) => existing.map((item) => item.id === updated.id ? updated : item));
+    return updated;
+  }
+
   function normalizeVoiceText(text: string) {
     return text.toLowerCase().trim().replace(/[.,!?_\-]/g, " ").replace(/\s+/g, " ");
   }
@@ -1125,7 +1133,8 @@ function RuralRetailOS() {
 
     } else if (intent === "ADD_PURCHASE") {
       // ── Step 1: find customer (do NOT rely on selectedCustomer state) ──────
-      const cust = findCustomerFuzzy(cmd.customerName ?? "") ?? selectedCustomer;
+      const commandMentionsCustomer = Boolean(cmd.customerName && cmd.customerName.trim());
+      const cust = findCustomerFuzzy(cmd.customerName ?? "") ?? (!commandMentionsCustomer ? selectedCustomer : null);
       if (!cust) {
         setStatus(`❌ Customer "${cmd.customerName ?? "unknown"}" not found. Please check the name.`);
         return;
@@ -1154,15 +1163,7 @@ function RuralRetailOS() {
       try {
         if (demoMode) {
           // Demo mode: update local state directly
-          setSelectedCustomer(prev =>
-            prev ? { ...prev, outstandingBalance: String(Number(prev.outstandingBalance ?? 0) + total) } : prev
-          );
-          setCustomers(prev =>
-            prev.map(c => c.id === cust.id
-              ? { ...c, outstandingBalance: String(Number(c.outstandingBalance ?? 0) + total) }
-              : c
-            )
-          );
+          const updatedCustomer = applyResolvedCustomerBalance(cust, total);
           setTodayCreditVal(prev => prev + total);
           setTodaySalesVal(prev => prev + total);
           setStatus(`✅ ${qtyStr} ${prod.name} added to ${cust.name}'s account! (₹${total.toFixed(2)})`);
@@ -1175,7 +1176,7 @@ function RuralRetailOS() {
               productName: prod.name,
               quantity: qtyStr,
               amount: total,
-              balance: Number(cust.outstandingBalance ?? 0) + total,
+              balance: Number(updatedCustomer.outstandingBalance ?? 0),
               shopName: process.env.NEXT_PUBLIC_SHOP_NAME ?? "GramMart Store",
               language,
             }).catch(() => {});
@@ -1188,15 +1189,7 @@ function RuralRetailOS() {
             items: [{ productId: prod.id, quantity: qtyStr }],
           });
           const billTotal = Number(bill?.totalAmount ?? total);
-          setSelectedCustomer(prev =>
-            prev ? { ...prev, outstandingBalance: String(Number(prev.outstandingBalance ?? 0) + billTotal) } : prev
-          );
-          setCustomers(prev =>
-            prev.map(c => c.id === cust.id
-              ? { ...c, outstandingBalance: String(Number(c.outstandingBalance ?? 0) + billTotal) }
-              : c
-            )
-          );
+          const updatedCustomer = applyResolvedCustomerBalance(cust, billTotal);
           setTodayCreditVal(prev => prev + billTotal);
           setTodaySalesVal(prev => prev + billTotal);
           setStatus(`✅ ${qtyStr} ${prod.name} added to ${cust.name}'s account! (₹${billTotal.toFixed(2)})`);
@@ -1209,7 +1202,7 @@ function RuralRetailOS() {
               productName: prod.name,
               quantity: qtyStr,
               amount: billTotal,
-              balance: Number(cust.outstandingBalance ?? 0) + billTotal,
+              balance: Number(updatedCustomer.outstandingBalance ?? 0),
               shopName: process.env.NEXT_PUBLIC_SHOP_NAME ?? "GramMart Store",
               language,
             }).catch(() => {});
@@ -1217,15 +1210,7 @@ function RuralRetailOS() {
         }
       } catch {
         // Fallback to demo mode on API failure
-        setSelectedCustomer(prev =>
-          prev ? { ...prev, outstandingBalance: String(Number(prev.outstandingBalance ?? 0) + total) } : prev
-        );
-        setCustomers(prev =>
-          prev.map(c => c.id === cust.id
-            ? { ...c, outstandingBalance: String(Number(c.outstandingBalance ?? 0) + total) }
-            : c
-          )
-        );
+        applyResolvedCustomerBalance(cust, total);
         setTodayCreditVal(prev => prev + total);
         setTodaySalesVal(prev => prev + total);
         setStatus(`✅ ${qtyStr} ${prod.name} added to ${cust.name}'s account! (₹${total.toFixed(2)})`);
@@ -1412,16 +1397,7 @@ function RuralRetailOS() {
   function handleConfirmVoice() {
     if (pendingVoiceCommand) {
       if (pendingVoiceCommand.intent === "ADD_PURCHASE") {
-        let prod = selectedProduct;
-        if (!prod && pendingVoiceCommand.productAlias) {
-          const alias = pendingVoiceCommand.productAlias.toLowerCase().trim();
-          prod = resolveProductFromVoice(alias, alias, language);
-        }
-        if (prod) {
-          executeSaveCredit(prod, voiceQuantity);
-        } else {
-          setStatus("No product selected or found to save.");
-        }
+        void executeDirectCommand({ ...pendingVoiceCommand, quantity: pendingVoiceCommand.quantity ?? voiceQuantity });
       } else if (pendingVoiceCommand.intent === "RECEIVE_PAYMENT") {
         executeSavePayment(Number(voiceAmount || 0));
       }
