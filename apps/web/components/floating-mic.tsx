@@ -164,6 +164,7 @@ function parseCommand(text: string, language: Language): ParsedCommand {
   else if (has(INTENTS.balance)) intent = "ASK_BALANCE";
   else if (has(INTENTS.open))    intent = "OPEN_CUSTOMER";
   else if (has(INTENTS.add))     intent = "ADD_PURCHASE";
+  if (productInfoQuery) intent = "ASK_PRODUCT";
   if (has(INTENTS.open) && has(INTENTS.add)) intent = "ADD_PURCHASE";
 
   // ── Customer name extraction ────────────────────────────────────────────
@@ -252,13 +253,14 @@ function speak(text: string, langCode: string) {
 function IntentCard({ cmd, language }: { cmd: ParsedCommand; language: Language }) {
   const intentLabels: Record<string,string> = {
     OPEN_CUSTOMER:"Open Account", ADD_PURCHASE:"Credit Sale", RECEIVE_PAYMENT:"Record Payment",
-    ASK_BALANCE:"Check Balance", SHOW_REPORT:"View Report", CONFIRM:"Confirm", CANCEL:"Cancel", UNKNOWN:"Unknown",
+    ASK_BALANCE:"Check Balance", ASK_PRODUCT:"Product Question", SHOW_REPORT:"View Report", CONFIRM:"Confirm", CANCEL:"Cancel", UNKNOWN:"Unknown",
   };
   const intentColors: Record<string,string> = {
     OPEN_CUSTOMER:"bg-blue-50 border-blue-200 text-blue-800",
     ADD_PURCHASE:"bg-amber-50 border-amber-200 text-amber-800",
     RECEIVE_PAYMENT:"bg-green-50 border-green-200 text-green-800",
     ASK_BALANCE:"bg-purple-50 border-purple-200 text-purple-800",
+    ASK_PRODUCT:"bg-leaf-50 border-leaf-200 text-leaf-800",
     SHOW_REPORT:"bg-slate-50 border-slate-200 text-slate-800",
     UNKNOWN:"bg-red-50 border-red-200 text-red-700",
   };

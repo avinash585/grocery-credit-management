@@ -234,6 +234,17 @@ const voiceEssentialProducts: Product[] = [
     nameKn: "ಹಾಲು",
     nameMl: "പാൽ",
     aliases: "milk,paal,doodh,amul milk,aavin milk,nandini milk"
+  },
+  {
+    id: "demo-noodles-1",
+    sku: "SNACK-001",
+    name: "Maggi Noodles",
+    sellingPrice: "15.00",
+    category: "Snacks",
+    unit: "Pack",
+    enabled: true,
+    stockQuantity: "100.00",
+    aliases: "maggi,noodles,magi,maagi,instant noodles,2 minute noodles"
   }
 ];
 
