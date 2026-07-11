@@ -69,7 +69,11 @@ Business Logic Rules:
 1. Credit Risk Detection: If a customer has a balance > Rs. 400, warn the merchant politely to collect payment before extending more credit (e.g. "**Kumar Stores** owes **Rs. 420**, suggest collecting payment first").
 2. Smart Restocking: If analyzing catalog or general tips, suggest restocking items based on seasonal rural demands (e.g. Sugar during festival times, Cooking Oil during wedding seasons, Dal for daily staples).
 3. Transaction Assistance: If a transaction transcript is passed, explain what action is detected and how to proceed (e.g., "Ready to record Rs.500 payment for Kumar").
-4. Action Triggering: If the Shopkeeper Query or Voice Input implies a direct action (e.g. opening a customer, recording a credit sale, receiving a payment, sending a reminder, showing report), you MUST append a structured command block at the very end of your response inside a markdown code block labeled "action".
+4. Action Triggering Safety:
+   - Only append an action block when the shopkeeper clearly asks for an operation using explicit verbs such as add, put, give, credit, record, save, receive payment, paid, send reminder, or open account.
+   - Product questions such as "price of milk", "maida rate", "is rice available", "stock of sugar", or "how much is oil" are informational. Answer from the catalog only. Do NOT append an action block and do NOT create a credit sale.
+   - If a product and customer are mentioned but the action is unclear, ask one short clarification question instead of emitting an action.
+   - If the Shopkeeper Query or Voice Input clearly implies a direct action (e.g. opening a customer, recording a credit sale, receiving a payment, sending a reminder, showing report), append a structured command block at the very end of your response inside a markdown code block labeled "action".
    Supported intents:
    - OPEN_CUSTOMER: { "intent": "OPEN_CUSTOMER", "customerName": "..." }
    - ADD_PURCHASE: { "intent": "ADD_PURCHASE", "customerName": "...", "productAlias": "...", "quantity": "..." }
@@ -93,6 +97,9 @@ Shopkeeper Query: "${body.message || "Give me today guidance"}"`;
 }
 
 function fallback(body: ChatRequest) {
+  const productAnswer = fallbackProductAnswer(body);
+  if (productAnswer) return productAnswer;
+
   if (body.message?.toLowerCase().includes("who owes") && body.customers && body.customers.length > 0) {
     const sorted = [...body.customers].sort((a, b) => Number(b.outstandingBalance ?? 0) - Number(a.outstandingBalance ?? 0));
     const highest = sorted[0];
@@ -101,4 +108,17 @@ function fallback(body: ChatRequest) {
   const customer = body.customerName || "Customer";
   const balance = body.outstandingBalance || "0";
   return `Account dues for **${customer}**: **Rs.${balance}**. Click Payment to settle dues or Credit Sale to log purchase.`;
+}
+
+function fallbackProductAnswer(body: ChatRequest) {
+  const message = body.message?.toLowerCase().trim() ?? "";
+  if (!/\b(price|rate|cost|mrp|stock|available|availability|how much)\b/.test(message)) return null;
+  const products = body.products ?? [];
+  const words = message.split(/\s+/).filter(word => word.length > 2 && !["price", "rate", "cost", "mrp", "stock", "available", "availability", "how", "much", "what", "tell", "show"].includes(word));
+  const product = products.find(item => {
+    const haystack = [item.name, item.sku].filter(Boolean).join(" ").toLowerCase();
+    return words.some(word => haystack.includes(word));
+  });
+  if (!product) return "I can answer product price or stock, but I could not find that item in the catalog. Please say the item name again.";
+  return `${product.name} price is **Rs.${product.sellingPrice}**. I have not added it to any customer account.`;
 }

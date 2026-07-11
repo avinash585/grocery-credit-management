@@ -843,6 +843,25 @@ function RuralRetailOS() {
     return text.toLowerCase().trim().replace(/[.,!?_\-]/g, " ").replace(/\s+/g, " ");
   }
 
+  function isProductInfoQueryText(text: string) {
+    const normalized = normalizeVoiceText(text);
+    return /\b(price|rate|cost|mrp|stock|available|availability|how much|what is|tell me|show me)\b/.test(normalized)
+      || normalized.includes("விலை")
+      || normalized.includes("இருப்பு")
+      || normalized.includes("எவ்வளவு")
+      || normalized.includes("கிடைக்குமா");
+  }
+
+  function isExplicitPurchaseCommandText(text: string) {
+    const normalized = normalizeVoiceText(text);
+    return /\b(add|put|give|credit|sale|sold|purchase|bought|bill|record|save|write|enter|log)\b/.test(normalized)
+      || normalized.includes("கடன்")
+      || normalized.includes("சேர்")
+      || normalized.includes("போடு")
+      || normalized.includes("கொடு")
+      || normalized.includes("வாங்கினார்");
+  }
+
   function productSearchText(product: Product, lang: Language) {
     return [
       product.name,
@@ -942,7 +961,9 @@ function RuralRetailOS() {
       intent = "RECEIVE_PAYMENT";
     }
     const detectedProduct = resolveProductFromVoice(undefined, normalized, lang);
-    if (normalized.includes("add") || normalized.includes("put") || normalized.includes("give") || normalized.includes("credit") || normalized.includes("sale") || normalized.includes("purchase") || detectedProduct || normalized.includes("sugar") || normalized.includes("rice") || normalized.includes("milk") || normalized.includes("oil") || normalized.includes("dal") || normalized.includes("கடன்") || normalized.includes("சேர்")) {
+    const isProductInfoQuery = isProductInfoQueryText(normalized);
+    const isExplicitPurchaseCommand = isExplicitPurchaseCommandText(normalized);
+    if (isExplicitPurchaseCommand && !isProductInfoQuery) {
       if (!normalized.includes("paid") && !normalized.includes("received")) {
         intent = "ADD_PURCHASE";
       }
@@ -1573,6 +1594,13 @@ function RuralRetailOS() {
             }}
             onRunCommand={async () => {
               if (transcript.trim()) {
+                if (isProductInfoQueryText(transcript.trim())) {
+                  setAiQueryOverride(transcript.trim());
+                  setView("ai");
+                  setActiveTask("ai");
+                  setStatus(`Answering product question: "${transcript.trim()}"`);
+                  return;
+                }
                 setBusy(true);
                 setStatus("Parsing transaction command...");
                 try {
@@ -1664,6 +1692,14 @@ function RuralRetailOS() {
         if (!cmd || !cmd.intent) return;
         const transcriptText = [cmd.customerName, cmd.productAlias, cmd.quantity, cmd.amount, cmd.intent].filter(Boolean).join(" ");
         const rawText = "rawText" in cmd && typeof cmd.rawText === "string" ? cmd.rawText : "";
+        if (isProductInfoQueryText(rawText || transcript || transcriptText)) {
+          const question = rawText || transcript || transcriptText;
+          setAiQueryOverride(question);
+          setView("ai");
+          setActiveTask("ai");
+          setStatus(`Answering product question: "${question}"`);
+          return;
+        }
         const enrichedCommand = parseLocalCommand(rawText || transcript || transcriptText, language);
         const commandToRun = enrichedCommand.intent !== "UNKNOWN" ? enrichedCommand : cmd;
         setTranscript(rawText || transcript || commandToRun.intent);
@@ -2584,6 +2620,59 @@ const speechLangCodes: Record<Language, string> = {
   MALAYALAM: "ml-IN"
 };
 
+function normalizeAssistantText(text: string) {
+  return text.toLowerCase().trim().replace(/[.,!?_\-|]/g, " ").replace(/\s+/g, " ");
+}
+
+function isAssistantInfoQuery(text: string) {
+  const normalized = normalizeAssistantText(text);
+  return /\b(price|rate|cost|mrp|stock|available|availability|how much|what is|tell me|show me)\b/.test(normalized)
+    || normalized.includes("விலை")
+    || normalized.includes("இருப்பு")
+    || normalized.includes("எவ்வளவு")
+    || normalized.includes("கிடைக்குமா");
+}
+
+function isAssistantMutationCommand(text: string) {
+  const normalized = normalizeAssistantText(text);
+  return /\b(add|put|give|credit|sale|sold|purchase|bought|bill|record|save|write|enter|log|receive|received|paid|payment|send reminder|remind|open account|open)\b/.test(normalized)
+    || normalized.includes("கடன்")
+    || normalized.includes("சேர்")
+    || normalized.includes("போடு")
+    || normalized.includes("கொடு")
+    || normalized.includes("பணம்")
+    || normalized.includes("திற");
+}
+
+function findCatalogProductForQuestion(text: string, products: Product[], language: Language) {
+  const normalized = normalizeAssistantText(text);
+  const words = normalized.split(" ").filter((word) => word.length > 2 && !["price", "rate", "cost", "stock", "available", "what", "how", "much", "tell", "show"].includes(word));
+  return products.find((product) => {
+    const haystack = [
+      product.name,
+      getProductName(product, language),
+      product.sku,
+      product.category,
+      product.brand,
+      product.unit,
+      product.aliases
+    ].filter(Boolean).join(" ").toLowerCase();
+    return words.some((word) => haystack.includes(word));
+  });
+}
+
+function localProductQueryAnswer(text: string, products: Product[], language: Language) {
+  if (!isAssistantInfoQuery(text) || isAssistantMutationCommand(text)) return null;
+  const product = findCatalogProductForQuestion(text, products, language);
+  if (!product) {
+    return "I can answer product price or stock, but I could not find that item in the catalog. Please say the item name again.";
+  }
+  const name = getProductName(product, language);
+  const unit = product.unit ? ` per ${product.unit}` : "";
+  const stock = product.stockQuantity ? ` Stock: ${Number(product.stockQuantity).toLocaleString()}${product.unit ? ` ${product.unit}` : ""}.` : "";
+  return `${name} price is Rs.${Number(product.sellingPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${unit}.${stock} I have not added it to any customer account.`;
+}
+
 function AIAssistant({
   status,
   setStatus,
@@ -2631,6 +2720,13 @@ function AIAssistant({
     setThinking(true);
     setAnswer(copy.listening);
     try {
+      const localCatalogAnswer = localProductQueryAnswer(text, products, language);
+      if (localCatalogAnswer) {
+        setAnswer(localCatalogAnswer);
+        setStatus(localCatalogAnswer);
+        return;
+      }
+
       const response = await chatWithAi({
         message: text,
         language,
@@ -2651,7 +2747,11 @@ function AIAssistant({
         try {
           const actionCmd = JSON.parse(match[1]);
           nextAnswer = nextAnswer.replace(/```action[\s\S]*?```/, "").trim();
-          onRunCommand(actionCmd);
+          if (isAssistantMutationCommand(text) && !isAssistantInfoQuery(text)) {
+            onRunCommand(actionCmd);
+          } else {
+            nextAnswer = `${nextAnswer || "I answered this as a question."} No account was changed. Say "add" or "record" if you want me to save a transaction.`;
+          }
         } catch (e) {
           console.error("Failed to parse action from AI response:", e);
         }

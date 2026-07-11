@@ -150,6 +150,11 @@ const numberWords: Record<string,string> = {
 function parseCommand(text: string, language: Language): ParsedCommand {
   const raw = text.toLowerCase().trim().replace(/[.,!?_\-|]/g," ").replace(/\s+/g," ");
   const has = (kws: string[]) => kws.some(k => raw.includes(k.toLowerCase()));
+  const productInfoQuery = /\b(price|rate|cost|mrp|stock|available|availability|how much|what is|tell me|show me)\b/.test(raw)
+    || raw.includes("விலை")
+    || raw.includes("இருப்பு")
+    || raw.includes("எவ்வளவு")
+    || raw.includes("கிடைக்குமா");
 
   let intent = "UNKNOWN";
   if      (has(INTENTS.confirm)) intent = "CONFIRM";
@@ -212,23 +217,23 @@ function parseCommand(text: string, language: Language): ParsedCommand {
   // ── Smart fallback: if product found but intent still UNKNOWN ────────────
   // e.g. "லட்சுமி அக்கவுண்டில் ஒரு கிலோ அரிசி" → clearly ADD_PURCHASE
   if (intent === "UNKNOWN") {
-    if (productAlias && customerName) intent = "ADD_PURCHASE";
-    else if (productAlias)            intent = "ADD_PURCHASE";
+    if (!productInfoQuery && productAlias && customerName) intent = "ADD_PURCHASE";
+    else if (!productInfoQuery && productAlias && has(INTENTS.add)) intent = "ADD_PURCHASE";
     else if (customerName)            intent = "OPEN_CUSTOMER";
   }
   // If open + product detected → compound command → ADD_PURCHASE
-  if (has(INTENTS.open) && productAlias) intent = "ADD_PURCHASE";
+  if (!productInfoQuery && has(INTENTS.open) && has(INTENTS.add) && productAlias) intent = "ADD_PURCHASE";
 
   // ── Smart fallback ──────────────────────────────────────────────────────
   // If NLP couldn't detect intent but found a product and/or customer,
   // infer the most likely intent automatically
   if (intent === "UNKNOWN") {
-    if (productAlias && customerName) intent = "ADD_PURCHASE";
-    else if (productAlias)            intent = "ADD_PURCHASE";
+    if (!productInfoQuery && productAlias && customerName) intent = "ADD_PURCHASE";
+    else if (!productInfoQuery && productAlias && has(INTENTS.add)) intent = "ADD_PURCHASE";
     else if (customerName)            intent = "OPEN_CUSTOMER";
   }
   // Compound command: open account + product mentioned → ADD_PURCHASE
-  if ((has(INTENTS.open) || has(INTENTS.add)) && productAlias) intent = "ADD_PURCHASE";
+  if (!productInfoQuery && has(INTENTS.add) && productAlias) intent = "ADD_PURCHASE";
 
   return { intent, customerName, productAlias, amount, quantity, rawText: text };
 }
