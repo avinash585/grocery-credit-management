@@ -100,17 +100,22 @@ public class SpeechIntelligenceService {
     }
 
     public VoiceCommandResponse parse(String transcript) {
-        return parse(transcript, Language.ENGLISH);
+        return parse(transcript, Language.AUTO);
     }
 
     public VoiceCommandResponse parse(String transcript, Language language) {
         long startTime = System.currentTimeMillis();
-        
+
+        // AUTO → detect from transcript
+        Language effectiveLang = (language == Language.AUTO || language == null)
+                ? detectLanguageEnum(transcript)
+                : language;
+
         // 1. LLM parsing (primary production-grade parsing) if api-key is configured
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
             try {
-                VoiceCommandResponse response = parseWithLLM(transcript, language);
-                logToDb(transcript, response, System.currentTimeMillis() - startTime);
+                VoiceCommandResponse response = parseWithLLM(transcript, effectiveLang);
+                logToDb(transcript, response, System.currentTimeMillis() - startTime, effectiveLang);
                 return response;
             } catch (Exception e) {
                 System.err.println("Gemini Voice Parse failed, falling back to local pipeline: " + e.getMessage());
@@ -118,9 +123,33 @@ public class SpeechIntelligenceService {
         }
 
         // 2. Local fallback pipeline execution
-        VoiceCommandResponse response = executeLocalPipeline(transcript, language);
-        logToDb(transcript, response, System.currentTimeMillis() - startTime);
+        VoiceCommandResponse response = executeLocalPipeline(transcript, effectiveLang);
+        logToDb(transcript, response, System.currentTimeMillis() - startTime, effectiveLang);
         return response;
+    }
+
+    /**
+     * Detects the language as a Language enum value (supports TANGLISH and HINGLISH).
+     */
+    private Language detectLanguageEnum(String transcript) {
+        String norm = transcript.toLowerCase(Locale.ROOT);
+
+        // Script-based detection (high confidence)
+        if (norm.matches(".*[\\u0B80-\\u0BFF].*") && norm.matches(".*[a-z].*")) return Language.TANGLISH;
+        if (norm.matches(".*[\\u0900-\\u097F].*") && norm.matches(".*[a-z].*")) return Language.HINGLISH;
+        if (norm.matches(".*[\\u0B80-\\u0BFF].*")) return Language.TAMIL;
+        if (norm.matches(".*[\\u0900-\\u097F].*")) return Language.HINDI;
+        if (norm.matches(".*[\\u0C00-\\u0C7F].*")) return Language.TELUGU;
+        if (norm.matches(".*[\\u0C80-\\u0CFF].*")) return Language.KANNADA;
+        if (norm.matches(".*[\\u0D00-\\u0D7F].*")) return Language.MALAYALAM;
+
+        // Keyword-based detection for romanized forms
+        String detected = detectLanguage(transcript, Language.ENGLISH);
+        try {
+            return Language.valueOf(detected);
+        } catch (IllegalArgumentException e) {
+            return Language.ENGLISH;
+        }
     }
 
     private VoiceCommandResponse parseWithLLM(String transcript, Language language) throws Exception {
@@ -441,10 +470,11 @@ public class SpeechIntelligenceService {
                     .toList());
         }
         String normalizedName = normalizeTerm(product.getNameEn());
-        if (normalizedName.contains("milk")) terms.addAll(List.of("milk", "paal", "doodh", "aavin milk", "amul milk", "nandini milk", "பால்"));
-        if (normalizedName.contains("rice")) terms.addAll(List.of("rice", "arisi", "chawal", "அரிசி"));
-        if (normalizedName.contains("sugar")) terms.addAll(List.of("sugar", "sakkarai", "chini", "cheeni", "சர்க்கரை"));
-        if (normalizedName.contains("noodles") || normalizedName.contains("maggi")) terms.addAll(List.of("noodles", "maggi", "magi", "instant noodles"));
+        Set<String> nameTokens = new HashSet<>(Arrays.asList(normalizedName.split("\\s+")));
+        if (nameTokens.contains("milk")) terms.addAll(List.of("milk", "paal", "doodh", "aavin milk", "amul milk", "nandini milk", "பால்"));
+        if (nameTokens.contains("rice")) terms.addAll(List.of("rice", "arisi", "chawal", "அரிசி"));
+        if (nameTokens.contains("sugar")) terms.addAll(List.of("sugar", "sakkarai", "chini", "cheeni", "சர்க்கரை"));
+        if (nameTokens.contains("noodles") || nameTokens.contains("maggi")) terms.addAll(List.of("noodles", "maggi", "magi", "instant noodles"));
         return terms;
     }
 
@@ -515,14 +545,16 @@ public class SpeechIntelligenceService {
         return clean;
     }
 
-    private void logToDb(String raw, VoiceCommandResponse response, long elapsedMs) {
+    private void logToDb(String raw, VoiceCommandResponse response, long elapsedMs, Language detectedLang) {
         if (voiceLogRepository == null || speechCommandRepository == null) return;
         try {
             double confScoreObj = (Double) response.slots().getOrDefault("confidence", 0.5);
             BigDecimal conf = BigDecimal.valueOf(confScoreObj);
-            String lang = (String) response.slots().getOrDefault("detectedLanguage", "ENGLISH");
+            String lang = detectedLang != null ? detectedLang.name() : (String) response.slots().getOrDefault("detectedLanguage", "ENGLISH");
 
-            VoiceLog log = new VoiceLog("demo-shop", raw, lang, conf, (int) elapsedMs);
+            // TODO: Get actual shopId from authentication context instead of hardcoded "demo-shop"
+            String shopId = "demo-shop"; // FIXME: Pass from SecurityContext
+            VoiceLog log = new VoiceLog(shopId, raw, lang, conf, (int) elapsedMs);
             SpeechCommand cmd = new SpeechCommand(
                 response.intent().name(),
                 response.customerName(),
@@ -539,7 +571,7 @@ public class SpeechIntelligenceService {
             // Log to learning history if confidence is low and intent/words are unrecognizable
             if (response.intent() == VoiceIntent.UNKNOWN && learningHistoryRepository != null) {
                 String normalized = (String) response.slots().getOrDefault("normalizedText", raw);
-                learningHistoryRepository.save(new LearningHistory("demo-shop", normalized, null, false));
+                learningHistoryRepository.save(new LearningHistory(shopId, normalized, null, false));
             }
         } catch (Exception e) {
             System.err.println("Speech Intelligence Layer: Failed to log voice transaction: " + e.getMessage());

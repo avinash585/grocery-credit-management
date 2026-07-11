@@ -1,4 +1,4 @@
-export type Language = "ENGLISH" | "TAMIL" | "HINDI" | "TELUGU" | "KANNADA" | "MALAYALAM";
+export type Language = "ENGLISH" | "TAMIL" | "HINDI" | "TELUGU" | "KANNADA" | "MALAYALAM" | "TANGLISH" | "HINGLISH";
 
 const english = {
   appName: "GramMart AI",
@@ -699,6 +699,122 @@ const malayalam: Partial<typeof english> = {
   loginSubtitle: "നിങ്ങളുടെ ഗ്രാമ റീറ്റെയിൽ ഓപ്പറേറ്റിംഗ് സിസ്റ്റം",
 };
 
+// ─── TANGLISH (Tamil + English mixed) ──────────────────────────────────────────
+const tanglish: Partial<typeof english> = {
+  appName: "GramMart AI",
+  productName: "Rural Retail OS",
+  ready: "Ready",
+  dashboard: "Indru ungal kadayil",
+  online: "Online",
+  offline: "Offline",
+  todaySales: "Sales",
+  todayCredit: "Credit",
+  todayPayments: "Payments",
+  pendingBalance: "Niluvai",
+  customers: "Customers",
+  billing: "Billing",
+  products: "Products",
+  connectShop: "Shop connect pannunga",
+  phone: "Phone",
+  password: "Password",
+  shopName: "Shop name",
+  ownerName: "Owner name",
+  loginRegister: "Login / Register",
+  customerAccount: "Customer account",
+  outstanding: "Outstanding",
+  addCustomer: "Customer",
+  addPurchase: "Credit sale",
+  receivePayment: "Payment",
+  productSearch: "Product search pannunga",
+  search: "Search",
+  quantity: "Quantity",
+  saveCredit: "Credit save pannunga",
+  amountReceived: "Amount received",
+  savePayment: "Payment save pannunga",
+  aiAssistant: "AI Assistant",
+  askSimpleWords: "Simple-a kelunga",
+  whoOwesMost: "Yaar romba niluvai vachirukanga?",
+  restockToday: "Indru enna restock pannanum?",
+  voiceAssistant: "Voice Assistant",
+  voicePrompt: "Example: Kumar account open pannu, 2 kg arisi add pannu, 500 rupees vangu",
+  listening: "Kelkudhu...",
+  customerName: "Customer name",
+  balance: "Balance",
+  save: "Save",
+  cancel: "Cancel",
+  confirm: "Confirm",
+  payment: "Payment",
+  creditSale: "Credit Sale",
+  product: "Product",
+  price: "Price",
+  total: "Total",
+  amount: "Amount",
+  rupees: "Rupees",
+  openAccount: "Account open pannu",
+  checkBalance: "Balance paaru",
+  sendReminder: "Reminder anuppu",
+  loginTitle: "GramMart AI-ku vanakkam",
+  loginSubtitle: "Ungaloda rural retail OS",
+};
+
+// ─── HINGLISH (Hindi + English mixed) ──────────────────────────────────────────
+const hinglish: Partial<typeof english> = {
+  appName: "GramMart AI",
+  productName: "Rural Retail OS",
+  ready: "Ready hai",
+  dashboard: "Aaj apki dukaan mein",
+  online: "Online",
+  offline: "Offline",
+  todaySales: "Sales",
+  todayCredit: "Udhar",
+  todayPayments: "Payments",
+  pendingBalance: "Baaki",
+  customers: "Customers",
+  billing: "Billing",
+  products: "Products",
+  connectShop: "Shop connect karo",
+  phone: "Phone",
+  password: "Password",
+  shopName: "Shop naam",
+  ownerName: "Owner naam",
+  loginRegister: "Login / Register",
+  customerAccount: "Customer account",
+  outstanding: "Baaki",
+  addCustomer: "Customer",
+  addPurchase: "Credit sale",
+  receivePayment: "Payment",
+  productSearch: "Product search karo",
+  search: "Search",
+  quantity: "Quantity",
+  saveCredit: "Credit save karo",
+  amountReceived: "Amount mila",
+  savePayment: "Payment save karo",
+  aiAssistant: "AI Assistant",
+  askSimpleWords: "Simple words mein pucho",
+  whoOwesMost: "Sabse zyada kaun baakidar hai?",
+  restockToday: "Aaj kya restock karna hai?",
+  voiceAssistant: "Voice Assistant",
+  voicePrompt: "Example: Kumar account kholo, 2 kg rice add karo, 500 rupees lo",
+  listening: "Sun raha hai...",
+  customerName: "Customer naam",
+  balance: "Balance",
+  save: "Save",
+  cancel: "Cancel",
+  confirm: "Confirm",
+  payment: "Payment",
+  creditSale: "Credit Sale",
+  product: "Product",
+  price: "Price",
+  total: "Total",
+  amount: "Amount",
+  rupees: "Rupees",
+  openAccount: "Account kholo",
+  checkBalance: "Balance dekho",
+  sendReminder: "Reminder bhejo",
+  loginTitle: "GramMart AI mein aapka swagat",
+  loginSubtitle: "Aapka rural retail OS",
+};
+
 export function t(language: Language): typeof english {
   const base = { ...english };
   const override =
@@ -707,6 +823,8 @@ export function t(language: Language): typeof english {
     language === "TELUGU"    ? telugu :
     language === "KANNADA"   ? kannada :
     language === "MALAYALAM" ? malayalam :
+    language === "TANGLISH"  ? tanglish :
+    language === "HINGLISH"  ? hinglish :
     {};
   return { ...base, ...override } as typeof english;
 }

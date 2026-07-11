@@ -2687,8 +2687,9 @@ function productResolutionTerms(product: Product, language: Language) {
   ].filter(Boolean) as string[];
 
   const normalizedName = normalizeAssistantText(product.name);
+  const nameTokens = new Set(tokenizeAssistantText(product.name));
   const synonymTerms = Object.entries(canonicalProductSynonyms)
-    .filter(([canonical, synonyms]) => normalizedName.includes(canonical) || synonyms.some((term) => normalizedName.includes(normalizeAssistantText(term))))
+    .filter(([canonical, synonyms]) => nameTokens.has(canonical) || synonyms.some((term) => normalizedName === normalizeAssistantText(term)))
     .flatMap(([, synonyms]) => synonyms);
 
   return Array.from(new Set([...baseTerms, ...synonymTerms].map(normalizeAssistantText).filter((term) => term.length > 1)));
