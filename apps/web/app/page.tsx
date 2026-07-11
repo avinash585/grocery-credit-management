@@ -901,19 +901,8 @@ function RuralRetailOS() {
   }
 
   function resolveProductFromVoice(alias: string | undefined, fullText: string, lang: Language) {
-    const searchText = canonicalProductAlias(`${alias ?? ""} ${fullText}`);
-    const words = searchText.split(/\s+/).filter((part) => part.length > 2);
-    const candidates = products
-      .filter((product) => {
-        const haystack = productSearchText(product, lang);
-        return haystack.includes(searchText) || words.some((part) => haystack.includes(part));
-      })
-      .sort((a, b) => {
-        const aExact = productSearchText(a, lang).split(/\s+/).includes(searchText) ? 0 : 1;
-        const bExact = productSearchText(b, lang).split(/\s+/).includes(searchText) ? 0 : 1;
-        return aExact - bExact || a.name.length - b.name.length;
-      });
-    return candidates[0] ?? null;
+    const resolution = resolveProductEntity(`${alias ?? ""} ${fullText}`, products, lang);
+    return resolution.product;
   }
 
   function extractVoiceCustomerName(normalized: string) {
@@ -2646,6 +2635,131 @@ function normalizeAssistantText(text: string) {
   return text.toLowerCase().trim().replace(/[.,!?_\-|]/g, " ").replace(/\s+/g, " ");
 }
 
+function tokenizeAssistantText(text: string) {
+  return normalizeAssistantText(text)
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+const productStopWords = new Set([
+  "price", "rate", "cost", "mrp", "stock", "available", "availability", "how", "much", "what", "is", "the", "of",
+  "tell", "show", "me", "add", "put", "give", "credit", "sale", "sold", "purchase", "bought", "bill", "record",
+  "save", "write", "enter", "log", "to", "for", "in", "on", "account", "khata", "kg", "kilo", "kilogram", "g",
+  "gram", "litre", "liter", "litres", "liters", "l", "ml", "packet", "pack", "piece", "pc"
+]);
+
+const canonicalProductSynonyms: Record<string, string[]> = {
+  milk: ["milk", "paal", "doodh", "aavin", "amul milk", "nandini milk", "பால்"],
+  rice: ["rice", "arisi", "chawal", "பச்சரிசி", "அரிசி"],
+  sugar: ["sugar", "sakkarai", "chini", "cheeni", "சர்க்கரை"],
+  oil: ["oil", "sunflower oil", "groundnut oil", "coconut oil", "ennai", "எண்ணெய்"],
+  dal: ["dal", "paruppu", "toor dal", "moong dal", "chana dal", "பருப்பு"],
+  noodles: ["noodles", "maggi", "magi", "maagi", "instant noodles", "2 minute noodles"]
+};
+
+type ProductResolution = {
+  product: Product | null;
+  confidence: number;
+  alternatives: Product[];
+  matchedTerm?: string;
+};
+
+function splitAliases(aliases?: string) {
+  if (!aliases) return [];
+  return aliases
+    .replace(/[\[\]"]/g, " ")
+    .split(/[,|;]/)
+    .map((alias) => alias.trim())
+    .filter(Boolean);
+}
+
+function productResolutionTerms(product: Product, language: Language) {
+  const baseTerms = [
+    product.name,
+    getProductName(product, language),
+    product.nameTa,
+    product.nameHi,
+    product.nameTe,
+    product.nameKn,
+    product.nameMl,
+    product.brand ? `${product.brand} ${product.name}` : undefined,
+    ...splitAliases(product.aliases)
+  ].filter(Boolean) as string[];
+
+  const normalizedName = normalizeAssistantText(product.name);
+  const synonymTerms = Object.entries(canonicalProductSynonyms)
+    .filter(([canonical, synonyms]) => normalizedName.includes(canonical) || synonyms.some((term) => normalizedName.includes(normalizeAssistantText(term))))
+    .flatMap(([, synonyms]) => synonyms);
+
+  return Array.from(new Set([...baseTerms, ...synonymTerms].map(normalizeAssistantText).filter((term) => term.length > 1)));
+}
+
+function resolveProductEntity(text: string, products: Product[], language: Language): ProductResolution {
+  const normalized = normalizeAssistantText(text);
+  const queryTokens = tokenizeAssistantText(text).filter((token) => !productStopWords.has(token) && !/^\d+(\.\d+)?$/.test(token));
+  const scored = products
+    .map((product) => {
+      let score = 0;
+      let matchedTerm: string | undefined;
+      for (const term of productResolutionTerms(product, language)) {
+        const termTokens = term.split(/\s+/).filter(Boolean);
+        if (!termTokens.length) continue;
+        const exactPhrase = new RegExp(`(^|\\s)${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`).test(normalized);
+        const allTokensPresent = termTokens.every((token) => queryTokens.includes(token));
+        const anyMeaningfulToken = termTokens.some((token) => token.length > 2 && queryTokens.includes(token));
+        if (exactPhrase) {
+          const next = Math.min(0.99, 0.93 + Math.min(term.length, 20) / 400);
+          if (next > score) {
+            score = next;
+            matchedTerm = term;
+          }
+        } else if (allTokensPresent) {
+          const next = termTokens.length > 1 ? 0.92 : 0.9;
+          if (next > score) {
+            score = next;
+            matchedTerm = term;
+          }
+        } else if (anyMeaningfulToken) {
+          const next = 0.72;
+          if (next > score) {
+            score = next;
+            matchedTerm = term;
+          }
+        }
+      }
+      return { product, score, matchedTerm };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.product.name.length - b.product.name.length);
+
+  const best = scored[0];
+  if (!best) return { product: null, confidence: 0, alternatives: [] };
+  const alternatives = scored
+    .filter((item) => item.product.id !== best.product.id && best.score - item.score < 0.04)
+    .map((item) => item.product)
+    .slice(0, 3);
+  return {
+    product: best.score >= 0.9 && alternatives.length === 0 ? best.product : null,
+    confidence: best.score,
+    alternatives: [best.product, ...alternatives].slice(0, 4),
+    matchedTerm: best.matchedTerm
+  };
+}
+
+function extractQuantityAndUnit(text: string) {
+  const normalized = normalizeAssistantText(text);
+  const numberWords: Record<string, string> = {
+    one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10"
+  };
+  const match = normalized.match(/(\d+(?:\.\d+)?)\s*(kg|kilo|kilogram|g|gram|litre|liter|litres|liters|l|ml|packet|pack|piece|pc)?/);
+  if (match) return { quantity: match[1], unit: match[2] };
+  for (const [word, value] of Object.entries(numberWords)) {
+    const wordMatch = normalized.match(new RegExp(`\\b${word}\\b\\s*(kg|kilo|kilogram|g|gram|litre|liter|litres|liters|l|ml|packet|pack|piece|pc)?`));
+    if (wordMatch) return { quantity: value, unit: wordMatch[1] };
+  }
+  return { quantity: undefined, unit: undefined };
+}
+
 function isAssistantInfoQuery(text: string) {
   const normalized = normalizeAssistantText(text);
   return /\b(price|rate|cost|mrp|stock|available|availability|how much|what is|tell me|show me)\b/.test(normalized)
@@ -2667,32 +2781,31 @@ function isAssistantMutationCommand(text: string) {
 }
 
 function findCatalogProductForQuestion(text: string, products: Product[], language: Language) {
-  const normalized = normalizeAssistantText(text);
-  const words = normalized.split(" ").filter((word) => word.length > 2 && !["price", "rate", "cost", "stock", "available", "what", "how", "much", "tell", "show"].includes(word));
-  return products.find((product) => {
-    const haystack = [
-      product.name,
-      getProductName(product, language),
-      product.sku,
-      product.category,
-      product.brand,
-      product.unit,
-      product.aliases
-    ].filter(Boolean).join(" ").toLowerCase();
-    return words.some((word) => haystack.includes(word));
-  });
+  return resolveProductEntity(text, products, language).product;
 }
 
 function localProductQueryAnswer(text: string, products: Product[], language: Language) {
   if (!isAssistantInfoQuery(text) || isAssistantMutationCommand(text)) return null;
-  const product = findCatalogProductForQuestion(text, products, language);
+  const resolution = resolveProductEntity(text, products, language);
+  const product = resolution.product;
   if (!product) {
-    return "I can answer product price or stock, but I could not find that item in the catalog. Please say the item name again.";
+    if (resolution.alternatives.length > 0) {
+      return `I found similar products but confidence is ${Math.round(resolution.confidence * 100)}%. Did you mean ${resolution.alternatives.map((item) => getProductName(item, language)).join(" or ")}?`;
+    }
+    return "I could not identify the product confidently. Please say the exact item name, for example Milk, Rice, or Sugar.";
   }
   const name = getProductName(product, language);
   const unit = product.unit ? ` per ${product.unit}` : "";
   const stock = product.stockQuantity ? ` Stock: ${Number(product.stockQuantity).toLocaleString()}${product.unit ? ` ${product.unit}` : ""}.` : "";
-  return `${name} price is Rs.${Number(product.sellingPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${unit}.${stock} I have not added it to any customer account.`;
+  const { quantity, unit: spokenUnit } = extractQuantityAndUnit(text);
+  const price = Number(product.sellingPrice);
+  const qty = Number(quantity ?? "0");
+  const mrp = product.mrp ? ` MRP: Rs.${Number(product.mrp).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.` : "";
+  if (qty > 0) {
+    const total = price * qty;
+    return `Intent: GET_PRODUCT_PRICE. Product: ${name}. Quantity: ${quantity}. Unit: ${spokenUnit ?? product.unit ?? "unit"}. ${quantity} ${spokenUnit ?? product.unit ?? ""} of ${name} costs Rs.${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Price: Rs.${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${unit}.${stock}${mrp} Confidence: ${Math.round(resolution.confidence * 100)}%.`;
+  }
+  return `Intent: GET_PRODUCT_PRICE. Product: ${name}. Current Price: Rs.${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${unit}.${stock}${mrp} Confidence: ${Math.round(resolution.confidence * 100)}%.`;
 }
 
 function findMentionedCustomer(text: string, customers: Customer[]) {
@@ -2705,7 +2818,7 @@ function findMentionedCustomer(text: string, customers: Customer[]) {
 }
 
 function findMentionedProduct(text: string, products: Product[], language: Language) {
-  return findCatalogProductForQuestion(text, products, language);
+  return resolveProductEntity(text, products, language).product;
 }
 
 function extractAssistantAmount(text: string) {
@@ -2715,25 +2828,7 @@ function extractAssistantAmount(text: string) {
 }
 
 function extractAssistantQuantity(text: string) {
-  const normalized = normalizeAssistantText(text);
-  const numberWords: Record<string, string> = {
-    one: "1",
-    two: "2",
-    three: "3",
-    four: "4",
-    five: "5",
-    six: "6",
-    seven: "7",
-    eight: "8",
-    nine: "9",
-    ten: "10"
-  };
-  const match = normalized.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilo|kilogram|g|gram|litre|liter|l|ml|packet|pack|piece|pc)?/);
-  if (match) return match[1];
-  for (const [word, value] of Object.entries(numberWords)) {
-    if (normalized.includes(word)) return value;
-  }
-  return "1";
+  return extractQuantityAndUnit(text).quantity ?? "1";
 }
 
 function parseAssistantAction(text: string, customers: Customer[], products: Product[], language: Language, activeCustomer: Customer | null) {

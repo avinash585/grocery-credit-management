@@ -2,9 +2,18 @@ package com.grammart.voice;
 
 public enum VoiceIntent {
     OPEN_CUSTOMER,
+    GET_PRODUCT_PRICE,
     ADD_PURCHASE,
+    REMOVE_ITEM,
     RECEIVE_PAYMENT,
+    GET_STOCK,
     ASK_BALANCE,
+    SEARCH_CUSTOMER,
+    SHOW_LEDGER,
+    SHOW_HISTORY,
+    SHOW_SALES,
+    SHOW_CREDIT,
+    GENERATE_REPORT,
     SEND_REMINDER,
     SHOW_REPORT,
     UNDO,
@@ -12,4 +21,3 @@ public enum VoiceIntent {
     CANCEL,
     UNKNOWN
 }
-

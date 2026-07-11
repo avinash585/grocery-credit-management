@@ -252,42 +252,55 @@ public class SpeechIntelligenceService {
 
         // Step 5: Intent Recognition
         VoiceIntent intent = VoiceIntent.UNKNOWN;
+        if (containsAny(normalized, "price", "rate", "cost", "mrp")) {
+            intent = VoiceIntent.GET_PRODUCT_PRICE;
+        } else if (containsAny(normalized, "stock", "available", "availability")) {
+            intent = VoiceIntent.GET_STOCK;
+        }
         if (pack != null && pack.containsKey("actions")) {
             Map<String, List<String>> actions = (Map<String, List<String>>) pack.get("actions");
-            for (Map.Entry<String, List<String>> action : actions.entrySet()) {
-                for (String trigger : action.getValue()) {
-                    if (normalized.contains(trigger)) {
-                        try {
-                            intent = VoiceIntent.valueOf(action.getKey());
-                            break;
-                        } catch (Exception e) {}
+            if (intent == VoiceIntent.UNKNOWN) {
+                for (Map.Entry<String, List<String>> action : actions.entrySet()) {
+                    for (String trigger : action.getValue()) {
+                        if (normalized.contains(trigger)) {
+                            try {
+                                intent = VoiceIntent.valueOf(action.getKey());
+                                break;
+                            } catch (Exception e) {}
+                        }
                     }
+                    if (intent != VoiceIntent.UNKNOWN) break;
                 }
-                if (intent != VoiceIntent.UNKNOWN) break;
             }
         }
 
         // Step 6: Entity Extraction
         BigDecimal amount = extractAmount(normalized, pack);
         String quantity = extractQuantity(normalized, pack);
-        String productAlias = extractProductAlias(normalized, pack);
+        ProductResolution productResolution = resolveProduct(normalized, pack);
+        String productAlias = productResolution.productAlias();
         String customerName = extractCustomerName(normalized, pack, intent);
 
         // Step 7: Confidence scoring
-        double confidence = 0.5;
-        if (intent != VoiceIntent.UNKNOWN) {
+        double confidence = productResolution.confidence();
+        if (intent != VoiceIntent.UNKNOWN && confidence < 0.5) {
             confidence += 0.25;
-            if (intent == VoiceIntent.ADD_PURCHASE && productAlias != null && quantity != null) confidence += 0.2;
-            if (intent == VoiceIntent.RECEIVE_PAYMENT && amount != null) confidence += 0.2;
-            if (customerName != null) confidence += 0.1;
         }
-        confidence = Math.min(confidence, 0.94); // Capped at 94% locally since LLM yields higher confidence
+        if (intent == VoiceIntent.ADD_PURCHASE && productAlias != null && quantity != null) confidence = Math.max(confidence, 0.92);
+        if ((intent == VoiceIntent.GET_PRODUCT_PRICE || intent == VoiceIntent.GET_STOCK) && productAlias != null) confidence = Math.max(confidence, 0.99);
+        if (intent == VoiceIntent.RECEIVE_PAYMENT && amount != null) confidence = Math.max(confidence, 0.9);
+        if (productAlias == null && (intent == VoiceIntent.GET_PRODUCT_PRICE || intent == VoiceIntent.GET_STOCK || intent == VoiceIntent.ADD_PURCHASE)) {
+            confidence = Math.min(confidence, 0.89);
+        }
+        confidence = Math.min(confidence, 0.99);
 
         return new VoiceCommandResponse(intent, customerName, productAlias, amount, quantity, Map.of(
             "confidence", confidence,
             "detectedLanguage", detectedLang,
             "normalizedText", normalized,
-            "raw", transcript
+            "raw", transcript,
+            "unit", Optional.ofNullable(extractUnit(normalized)).orElse(""),
+            "alternatives", productResolution.alternatives()
         ));
     }
 
@@ -342,6 +355,105 @@ public class SpeechIntelligenceService {
         }
         return null;
     }
+
+    private String extractUnit(String text) {
+        Matcher matcher = Pattern.compile("\\b(kg|kilo|kilogram|g|gram|packet|pack|liter|litre|litres|liters|l|ml|piece|pc)\\b").matcher(text);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    private boolean containsAny(String text, String... tokens) {
+        for (String token : tokens) {
+            if (text.contains(token)) return true;
+        }
+        return false;
+    }
+
+    private ProductResolution resolveProduct(String text, Map<String, Object> pack) {
+        List<ProductCandidate> candidates = new ArrayList<>();
+        if (productRepository != null) {
+            try {
+                for (Product product : productRepository.findAll()) {
+                    if (!product.isEnabled()) continue;
+                    ProductCandidate candidate = scoreProduct(text, product.getNameEn(), productTerms(product));
+                    if (candidate.score() > 0) candidates.add(candidate);
+                }
+            } catch (RuntimeException ignored) {
+            }
+        }
+        if (candidates.isEmpty() && pack != null && pack.containsKey("products")) {
+            List<Map<String, Object>> productsList = (List<Map<String, Object>>) pack.get("products");
+            for (Map<String, Object> product : productsList) {
+                String id = String.valueOf(product.get("id"));
+                List<String> aliases = (List<String>) product.get("aliases");
+                ProductCandidate candidate = scoreProduct(text, id, aliases == null ? List.of(id) : aliases);
+                if (candidate.score() > 0) candidates.add(candidate);
+            }
+        }
+        candidates.sort(Comparator.comparingDouble(ProductCandidate::score).reversed());
+        if (candidates.isEmpty()) return new ProductResolution(null, 0.0, List.of());
+        ProductCandidate best = candidates.get(0);
+        List<String> alternatives = candidates.stream()
+                .filter(candidate -> !candidate.name().equals(best.name()) && best.score() - candidate.score() < 0.04)
+                .map(ProductCandidate::name)
+                .limit(3)
+                .toList();
+        if (best.score() < 0.9 || !alternatives.isEmpty()) {
+            List<String> allAlternatives = new ArrayList<>();
+            allAlternatives.add(best.name());
+            allAlternatives.addAll(alternatives);
+            return new ProductResolution(null, best.score(), allAlternatives);
+        }
+        return new ProductResolution(best.name(), best.score(), alternatives);
+    }
+
+    private ProductCandidate scoreProduct(String text, String productName, List<String> terms) {
+        double score = 0.0;
+        for (String rawTerm : terms) {
+            if (rawTerm == null || rawTerm.isBlank()) continue;
+            String term = normalizeTerm(rawTerm);
+            if (term.length() < 2) continue;
+            boolean exact = Pattern.compile("(^|\\s)" + Pattern.quote(term) + "(\\s|$)").matcher(text).find();
+            if (exact) {
+                score = Math.max(score, Math.min(0.99, 0.93 + Math.min(term.length(), 20) / 400.0));
+                continue;
+            }
+            List<String> termTokens = Arrays.stream(term.split("\\s+")).filter(token -> token.length() > 2).toList();
+            if (!termTokens.isEmpty() && termTokens.stream().allMatch(token -> Pattern.compile("(^|\\s)" + Pattern.quote(token) + "(\\s|$)").matcher(text).find())) {
+                score = Math.max(score, termTokens.size() > 1 ? 0.92 : 0.9);
+            }
+        }
+        return new ProductCandidate(productName, score);
+    }
+
+    private List<String> productTerms(Product product) {
+        List<String> terms = new ArrayList<>();
+        terms.add(product.getNameEn());
+        terms.add(product.getNameTa());
+        terms.add(product.getNameHi());
+        terms.add(product.getNameTe());
+        terms.add(product.getNameKn());
+        terms.add(product.getNameMl());
+        if (product.getBrand() != null) terms.add(product.getBrand() + " " + product.getNameEn());
+        if (product.getAliases() != null) {
+            terms.addAll(Arrays.stream(product.getAliases().replace("[", " ").replace("]", " ").replace("\"", " ").split("[,|;]"))
+                    .map(String::trim)
+                    .filter(alias -> !alias.isBlank())
+                    .toList());
+        }
+        String normalizedName = normalizeTerm(product.getNameEn());
+        if (normalizedName.contains("milk")) terms.addAll(List.of("milk", "paal", "doodh", "aavin milk", "amul milk", "nandini milk", "பால்"));
+        if (normalizedName.contains("rice")) terms.addAll(List.of("rice", "arisi", "chawal", "அரிசி"));
+        if (normalizedName.contains("sugar")) terms.addAll(List.of("sugar", "sakkarai", "chini", "cheeni", "சர்க்கரை"));
+        if (normalizedName.contains("noodles") || normalizedName.contains("maggi")) terms.addAll(List.of("noodles", "maggi", "magi", "instant noodles"));
+        return terms;
+    }
+
+    private String normalizeTerm(String text) {
+        return text.toLowerCase(Locale.ROOT).trim().replaceAll("[.,!?_\\-]", " ").replaceAll("\\s+", " ");
+    }
+
+    private record ProductCandidate(String name, double score) {}
+    private record ProductResolution(String productAlias, double confidence, List<String> alternatives) {}
 
     private String extractProductAlias(String text, Map<String, Object> pack) {
         if (pack != null && pack.containsKey("products")) {

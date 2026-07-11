@@ -146,13 +146,19 @@ public class VoiceCommandService {
         if (containsAny(normalized, "receive", "payment", "paid", "vasool", "கட்டணம்", "भुगतान")) {
             return response(VoiceIntent.RECEIVE_PAYMENT, extractName(normalized), null, extractMoney(normalized), null);
         }
+        if (containsAny(normalized, "price", "rate", "cost", "mrp")) {
+            return response(VoiceIntent.GET_PRODUCT_PRICE, null, extractProduct(normalized), null, extractQuantity(normalized));
+        }
+        if (containsAny(normalized, "stock", "available", "availability")) {
+            return response(VoiceIntent.GET_STOCK, null, extractProduct(normalized), null, extractQuantity(normalized));
+        }
         if (containsAny(normalized, "owe", "balance", "evlo", "kitna", "எவ்வளவு", "कितना")) {
             return response(VoiceIntent.ASK_BALANCE, extractName(normalized), null, null, null);
         }
         if (containsAny(normalized, "open", "account", "கணக்கு", "khata")) {
             return response(VoiceIntent.OPEN_CUSTOMER, extractName(normalized), null, null, null);
         }
-        if (containsAny(normalized, "add", "kg", "packet", "liter", "arisi", "rice", "chawal")) {
+        if (containsAny(normalized, "add", "kg", "packet", "liter", "litre", "milk", "paal", "doodh", "arisi", "rice", "chawal")) {
             return response(VoiceIntent.ADD_PURCHASE, extractName(normalized), extractProduct(normalized), extractMoney(normalized), extractQuantity(normalized));
         }
         if (containsAny(normalized, "reminder", "sms", "message")) {
@@ -188,8 +194,11 @@ public class VoiceCommandService {
     }
 
     private String extractProduct(String text) {
-        for (String alias : new String[]{"arisi", "rice", "chawal", "sugar", "oil", "dal"}) {
+        for (String alias : new String[]{"milk", "paal", "doodh", "arisi", "rice", "chawal", "sugar", "oil", "dal", "noodles", "maggi"}) {
             if (text.contains(alias)) {
+                if (alias.equals("paal") || alias.equals("doodh")) return "milk";
+                if (alias.equals("arisi") || alias.equals("chawal")) return "rice";
+                if (alias.equals("maggi")) return "noodles";
                 return alias;
             }
         }
