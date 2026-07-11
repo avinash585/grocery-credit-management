@@ -1587,9 +1587,12 @@ function RuralRetailOS() {
             transcript={transcript}
             customers={customers}
             products={products}
+            todaySales={todaySalesVal}
+            todayCredit={todayCreditVal}
+            todayPayments={todayPaymentsVal}
             aiQueryOverride={aiQueryOverride}
             setAiQueryOverride={setAiQueryOverride}
-            onRunCommand={handleVoiceCommand}
+            onRunCommand={executeDirectCommand}
           />
           <VoiceCard
             transcript={transcript}
@@ -1713,6 +1716,14 @@ function RuralRetailOS() {
         }
         const enrichedCommand = parseLocalCommand(rawText || transcript || transcriptText, language);
         const commandToRun = enrichedCommand.intent !== "UNKNOWN" ? enrichedCommand : cmd;
+        if (String(commandToRun.intent).toUpperCase() === "UNKNOWN") {
+          const question = rawText || transcript || transcriptText;
+          setAiQueryOverride(question);
+          setView("ai");
+          setActiveTask("ai");
+          setStatus(`Answering with AI Command Center: "${question}"`);
+          return;
+        }
         setTranscript(rawText || transcript || commandToRun.intent);
         // Always try direct execution first (auto-completes compound commands)
         try {
@@ -2684,6 +2695,131 @@ function localProductQueryAnswer(text: string, products: Product[], language: La
   return `${name} price is Rs.${Number(product.sellingPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${unit}.${stock} I have not added it to any customer account.`;
 }
 
+function findMentionedCustomer(text: string, customers: Customer[]) {
+  const normalized = normalizeAssistantText(text);
+  return customers.find((customer) => {
+    const name = customer.name.toLowerCase();
+    const first = name.split(/\s+/)[0];
+    return normalized.includes(name) || (first.length > 2 && normalized.includes(first)) || Boolean(customer.phone && normalized.includes(customer.phone));
+  });
+}
+
+function findMentionedProduct(text: string, products: Product[], language: Language) {
+  return findCatalogProductForQuestion(text, products, language);
+}
+
+function extractAssistantAmount(text: string) {
+  const normalized = normalizeAssistantText(text);
+  const match = normalized.match(/(?:rs|rupees|₹)?\s*(\d+(?:\.\d+)?)/);
+  return match?.[1];
+}
+
+function extractAssistantQuantity(text: string) {
+  const normalized = normalizeAssistantText(text);
+  const numberWords: Record<string, string> = {
+    one: "1",
+    two: "2",
+    three: "3",
+    four: "4",
+    five: "5",
+    six: "6",
+    seven: "7",
+    eight: "8",
+    nine: "9",
+    ten: "10"
+  };
+  const match = normalized.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilo|kilogram|g|gram|litre|liter|l|ml|packet|pack|piece|pc)?/);
+  if (match) return match[1];
+  for (const [word, value] of Object.entries(numberWords)) {
+    if (normalized.includes(word)) return value;
+  }
+  return "1";
+}
+
+function parseAssistantAction(text: string, customers: Customer[], products: Product[], language: Language, activeCustomer: Customer | null) {
+  const normalized = normalizeAssistantText(text);
+  const customer = findMentionedCustomer(text, customers) ?? activeCustomer;
+  const product = findMentionedProduct(text, products, language);
+
+  if (/\b(open|show|switch|load)\b/.test(normalized) && /\b(account|customer|khata)\b/.test(normalized)) {
+    const explicitCustomer = findMentionedCustomer(text, customers);
+    return { intent: "OPEN_CUSTOMER", customerName: explicitCustomer?.name };
+  }
+
+  if (/\b(paid|payment|receive|received|settled|cash)\b/.test(normalized)) {
+    return {
+      intent: "RECEIVE_PAYMENT",
+      customerName: customer?.name,
+      amount: extractAssistantAmount(text)
+    };
+  }
+
+  if (isAssistantMutationCommand(text) && product) {
+    return {
+      intent: "ADD_PURCHASE",
+      customerName: customer?.name,
+      productAlias: product.name,
+      quantity: extractAssistantQuantity(text)
+    };
+  }
+
+  return null;
+}
+
+function localBusinessAnswer(
+  text: string,
+  customers: Customer[],
+  products: Product[],
+  todaySales: number,
+  todayCredit: number,
+  todayPayments: number,
+  language: Language
+) {
+  const normalized = normalizeAssistantText(text);
+  const totalPending = customers.reduce((sum, customer) => sum + Number(customer.outstandingBalance ?? "0"), 0);
+  const pendingCustomers = customers
+    .filter((customer) => Number(customer.outstandingBalance ?? "0") > 0)
+    .sort((a, b) => Number(b.outstandingBalance ?? "0") - Number(a.outstandingBalance ?? "0"));
+
+  if (normalized.includes("who owes") || normalized.includes("owes most") || normalized.includes("highest pending")) {
+    const top = pendingCustomers[0];
+    return top ? `${top.name} owes the most: Rs.${Number(top.outstandingBalance ?? "0").toLocaleString()}.` : "No customer has pending credit right now.";
+  }
+
+  if (normalized.includes("pending customers") || normalized.includes("pending balance above")) {
+    const threshold = Number(extractAssistantAmount(text) ?? "0");
+    const rows = pendingCustomers.filter((customer) => Number(customer.outstandingBalance ?? "0") >= threshold).slice(0, 6);
+    return rows.length
+      ? `Pending customers: ${rows.map((customer) => `${customer.name} Rs.${Number(customer.outstandingBalance ?? "0").toLocaleString()}`).join(", ")}.`
+      : "No pending customers match that amount.";
+  }
+
+  if (normalized.includes("how many customers") || normalized.includes("customers registered")) {
+    return `${customers.length} customers are registered.`;
+  }
+
+  if (normalized.includes("outstanding") || normalized.includes("total credit") || normalized.includes("credit outstanding")) {
+    return `Total outstanding credit is Rs.${totalPending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
+  }
+
+  if (normalized.includes("today") && (normalized.includes("sale") || normalized.includes("sales"))) {
+    return `Today's sales are Rs.${todaySales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Credit sales: Rs.${todayCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Payments: Rs.${todayPayments.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
+  }
+
+  if (normalized.includes("low stock") || normalized.includes("running low") || normalized.includes("restock")) {
+    const lowStock = products
+      .filter((product) => Number(product.stockQuantity ?? "9999") <= 10)
+      .slice(0, 5);
+    if (lowStock.length) {
+      return `Restock needed: ${lowStock.map((product) => `${getProductName(product, language)} (${Number(product.stockQuantity ?? 0).toLocaleString()} left)`).join(", ")}.`;
+    }
+    const fastMoving = products.slice(0, 5).map((product) => getProductName(product, language)).join(", ");
+    return `No low-stock alert from current catalog. Check fast movers today: ${fastMoving}.`;
+  }
+
+  return null;
+}
+
 function AIAssistant({
   status,
   setStatus,
@@ -2693,6 +2829,9 @@ function AIAssistant({
   transcript,
   customers,
   products,
+  todaySales,
+  todayCredit,
+  todayPayments,
   aiQueryOverride,
   setAiQueryOverride,
   onRunCommand
@@ -2705,6 +2844,9 @@ function AIAssistant({
   transcript: string;
   customers: Customer[];
   products: Product[];
+  todaySales: number;
+  todayCredit: number;
+  todayPayments: number;
   aiQueryOverride: string;
   setAiQueryOverride: (val: string) => void;
   onRunCommand: (cmd: {
@@ -2713,7 +2855,7 @@ function AIAssistant({
     productAlias?: string;
     amount?: string;
     quantity?: string;
-  }) => void;
+  }) => void | Promise<void>;
 }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(status === "Ready" ? copy.ready : status);
@@ -2731,10 +2873,32 @@ function AIAssistant({
     setThinking(true);
     setAnswer(copy.listening);
     try {
+      const actionCommand = !isAssistantInfoQuery(text)
+        ? parseAssistantAction(text, customers, products, language, customer)
+        : null;
+      if (actionCommand) {
+        const confirmation = actionCommand.intent === "ADD_PURCHASE"
+          ? `Executing: add ${actionCommand.quantity ?? "1"} ${actionCommand.productAlias ?? "product"} to ${actionCommand.customerName ?? "current customer"} account.`
+          : actionCommand.intent === "RECEIVE_PAYMENT"
+            ? `Executing: receive Rs.${actionCommand.amount ?? "0"} from ${actionCommand.customerName ?? "current customer"}.`
+            : `Executing: open ${actionCommand.customerName ?? "customer"} account.`;
+        setAnswer(confirmation);
+        setStatus(confirmation);
+        await onRunCommand(actionCommand);
+        return;
+      }
+
       const localCatalogAnswer = localProductQueryAnswer(text, products, language);
       if (localCatalogAnswer) {
         setAnswer(localCatalogAnswer);
         setStatus(localCatalogAnswer);
+        return;
+      }
+
+      const businessAnswer = localBusinessAnswer(text, customers, products, todaySales, todayCredit, todayPayments, language);
+      if (businessAnswer) {
+        setAnswer(businessAnswer);
+        setStatus(businessAnswer);
         return;
       }
 
@@ -2759,7 +2923,7 @@ function AIAssistant({
           const actionCmd = JSON.parse(match[1]);
           nextAnswer = nextAnswer.replace(/```action[\s\S]*?```/, "").trim();
           if (isAssistantMutationCommand(text) && !isAssistantInfoQuery(text)) {
-            onRunCommand(actionCmd);
+            await onRunCommand(actionCmd);
           } else {
             nextAnswer = `${nextAnswer || "I answered this as a question."} No account was changed. Say "add" or "record" if you want me to save a transaction.`;
           }

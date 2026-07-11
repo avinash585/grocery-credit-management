@@ -493,7 +493,7 @@ export function FloatingMic({
                   </button>
                   <button
                     onClick={submitCommand}
-                    disabled={!parsedCmd || parsedCmd.intent === "UNKNOWN"}
+                    disabled={!finalText.trim()}
                     className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-leaf-600 py-2.5 text-sm font-black text-white hover:bg-leaf-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                   >
                     <Send className="h-4 w-4" />
