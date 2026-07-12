@@ -170,6 +170,7 @@ const english = {
   notificationSent: "Notification sent",
   loginTitle: "Welcome to GramMart AI",
   loginSubtitle: "Your rural retail operating system",
+  customerName: "Customer name",
 };
 
 // ─── TAMIL ─────────────────────────────────────────────────────────────────────
