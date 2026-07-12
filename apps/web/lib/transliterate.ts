@@ -4,7 +4,7 @@
  * Strategy: dictionary lookup first → phoneme-based fallback.
  */
 
-export type Language = "ENGLISH" | "TAMIL" | "HINDI" | "TELUGU" | "KANNADA" | "MALAYALAM";
+import { Language } from "./i18n";
 
 // ─── 1. Common Indian name dictionary ─────────────────────────────────────────
 const NAME_DICT: Record<string, Partial<Record<Language, string>>> = {
@@ -187,10 +187,10 @@ function applyPhonemes(word: string, map: PhonemeMap): string {
 // ─── 4. Main transliteration function ────────────────────────────────────────
 /**
  * Transliterate an English customer name to the target script.
- * Returns original name for ENGLISH or if no mapping found.
+ * Returns original name for ENGLISH, TANGLISH, HINGLISH or if no mapping found.
  */
 export function transliterateName(name: string, language: Language): string {
-  if (!name || language === "ENGLISH") return name;
+  if (!name || language === "ENGLISH" || language === "TANGLISH" || language === "HINGLISH") return name;
 
   const map = PHONEME_MAPS[language];
   if (!map) return name;
