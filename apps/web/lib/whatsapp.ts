@@ -1,14 +1,14 @@
 // ─── GramMart WhatsApp Notification Helper ───────────────────────────────────
 // Uses the /api/whatsapp route which calls Twilio under the hood
 
-import type { Language } from "./i18n";
+import { Language } from "./i18n";
 
 export type NotificationLanguage = Language;
 
 export type WhatsAppPayload =
-  | { type: "CREDIT_SALE";       to: string; language: NotificationLanguage; data: CreditData }
-  | { type: "PAYMENT_RECEIVED";  to: string; language: NotificationLanguage; data: PaymentData }
-  | { type: "BALANCE_REMINDER";  to: string; language: NotificationLanguage; data: ReminderData };
+  | { type: "CREDIT_SALE";       to: string; language: Language; data: CreditData }
+  | { type: "PAYMENT_RECEIVED";  to: string; language: Language; data: PaymentData }
+  | { type: "BALANCE_REMINDER";  to: string; language: Language; data: ReminderData };
 
 interface CreditData {
   customerName: string;
@@ -69,7 +69,7 @@ export function notifyCreditSale(opts: {
   amount:       number;
   balance:      number;
   shopName:     string;
-  language:     NotificationLanguage;
+  language:     Language;
 }) {
   return sendWhatsApp({
     type:     "CREDIT_SALE",
@@ -95,7 +95,7 @@ export function notifyPaymentReceived(opts: {
   amount:       number;
   balance:      number;
   shopName:     string;
-  language:     NotificationLanguage;
+  language:     Language;
 }) {
   return sendWhatsApp({
     type:     "PAYMENT_RECEIVED",
@@ -118,7 +118,7 @@ export function notifyBalanceReminder(opts: {
   customerName: string;
   balance:      number;
   shopName:     string;
-  language:     NotificationLanguage;
+  language:     Language;
 }) {
   return sendWhatsApp({
     type:     "BALANCE_REMINDER",
