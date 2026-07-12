@@ -73,6 +73,7 @@ Business Logic Rules:
    - Only append an action block when the shopkeeper clearly asks for an operation using explicit verbs such as add, put, give, credit, record, save, receive payment, paid, send reminder, or open account.
    - Product questions such as "price of milk", "maida rate", "is rice available", "stock of sugar", or "how much is oil" are informational. Answer from the catalog only. Do NOT append an action block and do NOT create a credit sale.
    - If a product and customer are mentioned but the action is unclear, ask one short clarification question instead of emitting an action.
+   - IMPORTANT: When the shopkeeper gives you a clear command like "open avinash account and add 1kg sugar", you MUST emit the action block for the transaction (ADD_PURCHASE takes priority over OPEN_CUSTOMER).
    - If the Shopkeeper Query or Voice Input clearly implies a direct action (e.g. opening a customer, recording a credit sale, receiving a payment, sending a reminder, showing report), append a structured command block at the very end of your response inside a markdown code block labeled "action".
    Supported intents:
    - OPEN_CUSTOMER: { "intent": "OPEN_CUSTOMER", "customerName": "..." }
@@ -83,8 +84,13 @@ Business Logic Rules:
 
    Example action block suffix (placed at the end of the text on a new line):
    \`\`\`action
-   { "intent": "OPEN_CUSTOMER", "customerName": "Kumar" }
+   { "intent": "ADD_PURCHASE", "customerName": "Avinash", "productAlias": "sugar", "quantity": "1" }
    \`\`\`
+
+   More examples:
+   - "open avinash account and add 1kg sugar" → Respond with natural language + action block for ADD_PURCHASE
+   - "kumar paid 500 rupees" → Respond + action block for RECEIVE_PAYMENT
+   - "how much is rice" → Just answer the price, NO action block
 
 Current Context:
 - Active Customer: ${body.customerName || "No customer selected"}

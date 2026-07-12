@@ -3020,13 +3020,29 @@ function AIAssistant({
         try {
           const actionCmd = JSON.parse(match[1]);
           nextAnswer = nextAnswer.replace(/```action[\s\S]*?```/, "").trim();
-          if (isAssistantMutationCommand(text) && !isAssistantInfoQuery(text)) {
-            await onRunCommand(actionCmd);
-          } else {
-            nextAnswer = `${nextAnswer || "I answered this as a question."} No account was changed. Say "add" or "record" if you want me to save a transaction.`;
+          // Always execute action commands from AI response
+          if (actionCmd && actionCmd.intent) {
+            await executeDirectCommand(actionCmd);
+            // Keep the AI's natural language response
+            if (!nextAnswer || nextAnswer.length < 10) {
+              nextAnswer = `Done. ${actionCmd.intent === "ADD_PURCHASE" ? `Added ${actionCmd.quantity || "1"} ${actionCmd.productAlias} to ${actionCmd.customerName || customer?.name || "account"}.` : actionCmd.intent === "RECEIVE_PAYMENT" ? `Received Rs.${actionCmd.amount} from ${actionCmd.customerName || customer?.name}.` : `Opened ${actionCmd.customerName} account.`}`;
+            }
           }
         } catch (e) {
           console.error("Failed to parse action from AI response:", e);
+          nextAnswer = `${nextAnswer || "I understood your request but couldn't execute it. Please try again."}`;
+        }
+      } else if (isAssistantMutationCommand(text) && !isAssistantInfoQuery(text)) {
+        // If user clearly wants to do something but AI didn't provide action block,
+        // try to parse and execute it directly
+        const fallbackAction = parseAssistantAction(text, customers, products, language, customer);
+        if (fallbackAction) {
+          nextAnswer = nextAnswer || "Processing your request...";
+          try {
+            await executeDirectCommand(fallbackAction);
+          } catch (e) {
+            console.error("Failed to execute fallback action:", e);
+          }
         }
       }
 
