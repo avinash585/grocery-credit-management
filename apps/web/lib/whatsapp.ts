@@ -2,7 +2,7 @@
 // Uses the /api/whatsapp route which calls Twilio under the hood
 
 export type NotificationLanguage =
-  | "ENGLISH" | "TAMIL" | "HINDI" | "TELUGU" | "KANNADA" | "MALAYALAM";
+  | "ENGLISH" | "TAMIL" | "HINDI" | "TELUGU" | "KANNADA" | "MALAYALAM" | "TANGLISH" | "HINGLISH";
 
 export type WhatsAppPayload =
   | { type: "CREDIT_SALE";       to: string; language: NotificationLanguage; data: CreditData }
