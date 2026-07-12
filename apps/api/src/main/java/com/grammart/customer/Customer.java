@@ -55,6 +55,10 @@ public class Customer extends BaseEntity {
         outstandingBalance = outstandingBalance.subtract(amount).max(BigDecimal.ZERO);
     }
 
+    public void setOutstandingBalance(BigDecimal balance) {
+        this.outstandingBalance = balance;
+    }
+
     public UUID getId() {
         return id;
     }
