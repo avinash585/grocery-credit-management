@@ -1,8 +1,9 @@
 // ─── GramMart WhatsApp Notification Helper ───────────────────────────────────
 // Uses the /api/whatsapp route which calls Twilio under the hood
 
-export type NotificationLanguage =
-  | "ENGLISH" | "TAMIL" | "HINDI" | "TELUGU" | "KANNADA" | "MALAYALAM" | "TANGLISH" | "HINGLISH";
+import type { Language } from "./i18n";
+
+export type NotificationLanguage = Language;
 
 export type WhatsAppPayload =
   | { type: "CREDIT_SALE";       to: string; language: NotificationLanguage; data: CreditData }
