@@ -38,6 +38,7 @@ type ParsedCommand = {
 const langCodes: Record<Language, string> = {
   ENGLISH: "en-IN", TAMIL: "ta-IN", HINDI: "hi-IN",
   TELUGU: "te-IN",  KANNADA: "kn-IN", MALAYALAM: "ml-IN",
+  TANGLISH: "en-IN", HINGLISH: "en-IN", // Code-switched languages use English voice
 };
 
 // ─── UI copy per language ─────────────────────────────────────────────────────
@@ -52,6 +53,8 @@ const ui: Record<Language, {
   TELUGU:    { tapRecord:"రికార్డ్ చేయడానికి నొక్కండి", tapStop:"ఆపడానికి నొక్కండి", submit:"సమర్పించు", retry:"మళ్ళీ", processing:"అమలు చేస్తోంది…", done:"అయింది!", review:"మీ ఆదేశాన్ని సరిచూడండి", placeholder:"మీ వాయిస్ ఆదేశం ఇక్కడ కనిపిస్తుంది…", notUnderstood:"అర్థం కాలేదు. మళ్ళీ ప్రయత్నించండి." },
   KANNADA:   { tapRecord:"ರೆಕಾರ್ಡ್ ಮಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ", tapStop:"ನಿಲ್ಲಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ", submit:"ಸಲ್ಲಿಸು", retry:"ಮತ್ತೆ", processing:"ಚಾಲನೆ…", done:"ಆಯ್ತು!", review:"ನಿಮ್ಮ ಆಜ್ಞೆಯನ್ನು ಪರಿಶೀಲಿಸಿ", placeholder:"ನಿಮ್ಮ ವಾಯ್ಸ್ ಕಮಾಂಡ್ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ…", notUnderstood:"ಅರ್ಥವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ." },
   MALAYALAM: { tapRecord:"റെക്കോർഡ് ചെയ്യാൻ ടാപ്പ് ചെയ്യൂ", tapStop:"നിർത്താൻ ടാപ്പ് ചെയ്യൂ", submit:"സമർപ്പിക്കൂ", retry:"വീണ്ടും", processing:"നടത്തുന്നു…", done:"ശരി!", review:"നിങ്ങളുടെ കമാൻഡ് പരിശോധിക്കൂ", placeholder:"നിങ്ങളുടെ വോയ്‌സ് കമാൻഡ് ഇവിടെ കാണിക്കും…", notUnderstood:"മനസ്സിലായില്ല. വീണ്ടും ശ്രമിക്കൂ." },
+  TANGLISH:  { tapRecord:"Tap to Record", tapStop:"Tap to Stop", submit:"Submit", retry:"Retry", processing:"Executing…", done:"Done!", review:"Review your command", placeholder:"Your voice command will appear here…", notUnderstood:"Could not understand. Please retry." },
+  HINGLISH:  { tapRecord:"Tap to Record", tapStop:"Tap to Stop", submit:"Submit", retry:"Retry", processing:"Executing…", done:"Done!", review:"Review your command", placeholder:"Your voice command will appear here…", notUnderstood:"Could not understand. Please retry." },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
