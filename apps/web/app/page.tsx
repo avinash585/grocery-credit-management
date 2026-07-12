@@ -2628,7 +2628,9 @@ const speechLangCodes: Record<Language, string> = {
   HINDI: "hi-IN",
   TELUGU: "te-IN",
   KANNADA: "kn-IN",
-  MALAYALAM: "ml-IN"
+  MALAYALAM: "ml-IN",
+  TANGLISH: "en-IN", // Tamil + English code-switching, use English voice
+  HINGLISH: "en-IN"  // Hindi + English code-switching, use English voice
 };
 
 function normalizeAssistantText(text: string) {
