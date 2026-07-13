@@ -3022,7 +3022,7 @@ function AIAssistant({
           nextAnswer = nextAnswer.replace(/```action[\s\S]*?```/, "").trim();
           // Always execute action commands from AI response
           if (actionCmd && actionCmd.intent) {
-            await executeDirectCommand(actionCmd);
+            await onRunCommand(actionCmd);
             // Keep the AI's natural language response
             if (!nextAnswer || nextAnswer.length < 10) {
               nextAnswer = `Done. ${actionCmd.intent === "ADD_PURCHASE" ? `Added ${actionCmd.quantity || "1"} ${actionCmd.productAlias} to ${actionCmd.customerName || customer?.name || "account"}.` : actionCmd.intent === "RECEIVE_PAYMENT" ? `Received Rs.${actionCmd.amount} from ${actionCmd.customerName || customer?.name}.` : `Opened ${actionCmd.customerName} account.`}`;
@@ -3039,7 +3039,7 @@ function AIAssistant({
         if (fallbackAction) {
           nextAnswer = nextAnswer || "Processing your request...";
           try {
-            await executeDirectCommand(fallbackAction);
+            await onRunCommand(fallbackAction);
           } catch (e) {
             console.error("Failed to execute fallback action:", e);
           }
