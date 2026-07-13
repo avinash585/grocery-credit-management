@@ -3035,17 +3035,23 @@ function AIAssistant({
 
   async function askQuestion(text: string) {
     setThinking(true);
-    setAnswer(copy.listening);
+    setAnswer("🤔 " + copy.listening);
     try {
       const actionCommand = !isAssistantInfoQuery(text)
         ? parseAssistantAction(text, customers, products, language, customer)
         : null;
       if (actionCommand) {
         const confirmation = actionCommand.intent === "ADD_PURCHASE"
-          ? `Executing: add ${actionCommand.quantity ?? "1"} ${actionCommand.productAlias ?? "product"} to ${actionCommand.customerName ?? "current customer"} account.`
+          ? `📦 Adding ${actionCommand.quantity ?? "1"} ${actionCommand.productAlias ?? "product"} to **${actionCommand.customerName ?? "current customer"}** account...`
           : actionCommand.intent === "RECEIVE_PAYMENT"
-            ? `Executing: receive Rs.${actionCommand.amount ?? "0"} from ${actionCommand.customerName ?? "current customer"}.`
-            : `Executing: open ${actionCommand.customerName ?? "customer"} account.`;
+            ? `💰 Recording **Rs.${actionCommand.amount ?? "0"}** payment from **${actionCommand.customerName ?? "current customer"}**...`
+            : actionCommand.intent === "UNDO_LAST_TRANSACTION"
+              ? `↩️ Undoing last transaction for **${actionCommand.customerName ?? "current customer"}**...`
+              : actionCommand.intent === "REVERSE_PAYMENT"
+                ? `🔄 Reversing payment for **${actionCommand.customerName ?? "current customer"}**...`
+                : actionCommand.intent === "REMOVE_PRODUCT"
+                  ? `🗑️ Removing ${actionCommand.productAlias ?? "product"} from **${actionCommand.customerName ?? "current customer"}** account...`
+                  : `👤 Opening **${actionCommand.customerName ?? "customer"}** account...`;
         setAnswer(confirmation);
         setStatus(confirmation);
         await onRunCommand(actionCommand);
@@ -3054,14 +3060,14 @@ function AIAssistant({
 
       const localCatalogAnswer = localProductQueryAnswer(text, products, language);
       if (localCatalogAnswer) {
-        setAnswer(localCatalogAnswer);
+        setAnswer("📋 " + localCatalogAnswer);
         setStatus(localCatalogAnswer);
         return;
       }
 
       const businessAnswer = localBusinessAnswer(text, customers, products, todaySales, todayCredit, todayPayments, language);
       if (businessAnswer) {
-        setAnswer(businessAnswer);
+        setAnswer("📊 " + businessAnswer);
         setStatus(businessAnswer);
         return;
       }
@@ -3088,22 +3094,32 @@ function AIAssistant({
           nextAnswer = nextAnswer.replace(/```action[\s\S]*?```/, "").trim();
           // Always execute action commands from AI response
           if (actionCmd && actionCmd.intent) {
+            // Show AI's natural language response first
+            if (nextAnswer && nextAnswer.length >= 10) {
+              setAnswer(nextAnswer);
+              setStatus(nextAnswer);
+              setThinking(false);
+              // Small delay to show AI response before executing
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
             await onRunCommand(actionCmd);
-            // Keep the AI's natural language response
+            // Update with completion message
             if (!nextAnswer || nextAnswer.length < 10) {
-              nextAnswer = `Done. ${
-                actionCmd.intent === "ADD_PURCHASE" ? `Added ${actionCmd.quantity || "1"} ${actionCmd.productAlias} to ${actionCmd.customerName || customer?.name || "account"}.` :
-                actionCmd.intent === "RECEIVE_PAYMENT" ? `Received Rs.${actionCmd.amount} from ${actionCmd.customerName || customer?.name}.` :
-                actionCmd.intent === "UNDO_LAST_TRANSACTION" ? `Undone last transaction for ${actionCmd.customerName || customer?.name}.` :
-                actionCmd.intent === "REVERSE_PAYMENT" ? `Reversed payment for ${actionCmd.customerName || customer?.name}.` :
-                actionCmd.intent === "REMOVE_PRODUCT" ? `Removed ${actionCmd.productAlias} from ${actionCmd.customerName || customer?.name}.` :
-                `Opened ${actionCmd.customerName} account.`
+              nextAnswer = `✅ Done! ${
+                actionCmd.intent === "ADD_PURCHASE" ? `Added ${actionCmd.quantity || "1"} ${actionCmd.productAlias} to **${actionCmd.customerName || customer?.name || "account"}**.` :
+                actionCmd.intent === "RECEIVE_PAYMENT" ? `Received **Rs.${actionCmd.amount}** from **${actionCmd.customerName || customer?.name}**.` :
+                actionCmd.intent === "UNDO_LAST_TRANSACTION" ? `Undone last transaction for **${actionCmd.customerName || customer?.name}**.` :
+                actionCmd.intent === "REVERSE_PAYMENT" ? `Reversed payment for **${actionCmd.customerName || customer?.name}**.` :
+                actionCmd.intent === "REMOVE_PRODUCT" ? `Removed ${actionCmd.productAlias} from **${actionCmd.customerName || customer?.name}**.` :
+                `Opened **${actionCmd.customerName}** account.`
               }`;
+            } else {
+              nextAnswer = "✅ " + nextAnswer;
             }
           }
         } catch (e) {
           console.error("Failed to parse action from AI response:", e);
-          nextAnswer = `${nextAnswer || "I understood your request but couldn't execute it. Please try again."}`;
+          nextAnswer = `⚠️ ${nextAnswer || "I understood your request but couldn't execute it. Please try again."}`;
         }
       } else if (isAssistantMutationCommand(text) && !isAssistantInfoQuery(text)) {
         // If user clearly wants to do something but AI didn't provide action block,
@@ -3113,16 +3129,19 @@ function AIAssistant({
           nextAnswer = nextAnswer || "Processing your request...";
           try {
             await onRunCommand(fallbackAction);
+            nextAnswer = "✅ " + nextAnswer;
           } catch (e) {
             console.error("Failed to execute fallback action:", e);
+            nextAnswer = "⚠️ " + nextAnswer;
           }
         }
       }
 
       setAnswer(nextAnswer);
       setStatus(nextAnswer);
-    } catch {
-      const nextAnswer = localAiAnswer(copy, customer);
+    } catch (error) {
+      console.error("AI query error:", error);
+      const nextAnswer = "⚠️ " + localAiAnswer(copy, customer);
       setAnswer(nextAnswer);
       setStatus(nextAnswer);
     } finally {
