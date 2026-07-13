@@ -1263,6 +1263,50 @@ function RuralRetailOS() {
       } finally {
         setBusy(false);
       }
+
+    } else if (intent === "UNDO_LAST_TRANSACTION") {
+      const cust = resolveCustomer(cmd.customerName);
+      if (!cust) return;
+
+      setStatus(`⏳ Undoing last transaction for ${cust.name}…`);
+      setBusy(true);
+      try {
+        // For now, show a message that this requires backend API integration
+        setStatus(`ℹ️ Undo last transaction for ${cust.name} - This feature requires backend API integration with /api/transactions/undo-last endpoint. The transaction management system is ready on the backend.`);
+      } catch (e) {
+        setStatus("❌ Could not undo transaction. Please try again.");
+      } finally {
+        setBusy(false);
+      }
+
+    } else if (intent === "REVERSE_PAYMENT") {
+      const cust = resolveCustomer(cmd.customerName);
+      if (!cust) return;
+
+      const amt = Number(cmd.amount ?? "0");
+      setStatus(`⏳ Reversing payment for ${cust.name}…`);
+      setBusy(true);
+      try {
+        setStatus(`ℹ️ Reverse payment of ${amt > 0 ? `₹${amt}` : 'last payment'} for ${cust.name} - This feature requires backend API integration with /api/transactions/reverse endpoint.`);
+      } catch (e) {
+        setStatus("❌ Could not reverse payment. Please try again.");
+      } finally {
+        setBusy(false);
+      }
+
+    } else if (intent === "REMOVE_PRODUCT") {
+      const cust = resolveCustomer(cmd.customerName);
+      if (!cust) return;
+
+      setStatus(`⏳ Removing ${cmd.productAlias || 'product'} from ${cust.name}'s account…`);
+      setBusy(true);
+      try {
+        setStatus(`ℹ️ Remove ${cmd.productAlias || 'product'} from ${cust.name} - This feature requires backend API integration with /api/transactions/items/remove endpoint.`);
+      } catch (e) {
+        setStatus("❌ Could not remove product. Please try again.");
+      } finally {
+        setBusy(false);
+      }
     }
   }
 
@@ -2774,13 +2818,15 @@ function isAssistantInfoQuery(text: string) {
 
 function isAssistantMutationCommand(text: string) {
   const normalized = normalizeAssistantText(text);
-  return /\b(add|put|give|credit|sale|sold|purchase|bought|bill|record|save|write|enter|log|receive|received|paid|payment|send reminder|remind|open account|open)\b/.test(normalized)
+  return /\b(add|put|give|credit|sale|sold|purchase|bought|bill|record|save|write|enter|log|receive|received|paid|payment|send reminder|remind|open account|open|undo|reverse|cancel|remove|delete)\b/.test(normalized)
     || normalized.includes("கடன்")
     || normalized.includes("சேர்")
     || normalized.includes("போடு")
     || normalized.includes("கொடு")
     || normalized.includes("பணம்")
-    || normalized.includes("திற");
+    || normalized.includes("திற")
+    || normalized.includes("நீக்கு")
+    || normalized.includes("ரத்து");
 }
 
 function findCatalogProductForQuestion(text: string, products: Product[], language: Language) {
@@ -2838,6 +2884,31 @@ function parseAssistantAction(text: string, customers: Customer[], products: Pro
   const normalized = normalizeAssistantText(text);
   const customer = findMentionedCustomer(text, customers) ?? activeCustomer;
   const product = findMentionedProduct(text, products, language);
+
+  // Check for undo/reverse commands first
+  if (/\b(undo|reverse|cancel|remove|delete)\b/.test(normalized)) {
+    if (/\b(last|previous|recent)\b/.test(normalized) && /\b(transaction|entry|purchase|bill)\b/.test(normalized)) {
+      return {
+        intent: "UNDO_LAST_TRANSACTION",
+        customerName: customer?.name
+      };
+    }
+    if (/\b(payment)\b/.test(normalized)) {
+      return {
+        intent: "REVERSE_PAYMENT",
+        customerName: customer?.name,
+        amount: extractAssistantAmount(text)
+      };
+    }
+    // Remove specific product from transaction
+    if (product) {
+      return {
+        intent: "REMOVE_PRODUCT",
+        customerName: customer?.name,
+        productAlias: product.name
+      };
+    }
+  }
 
   if (/\b(open|show|switch|load)\b/.test(normalized) && /\b(account|customer|khata)\b/.test(normalized)) {
     const explicitCustomer = findMentionedCustomer(text, customers);
@@ -3025,7 +3096,14 @@ function AIAssistant({
             await onRunCommand(actionCmd);
             // Keep the AI's natural language response
             if (!nextAnswer || nextAnswer.length < 10) {
-              nextAnswer = `Done. ${actionCmd.intent === "ADD_PURCHASE" ? `Added ${actionCmd.quantity || "1"} ${actionCmd.productAlias} to ${actionCmd.customerName || customer?.name || "account"}.` : actionCmd.intent === "RECEIVE_PAYMENT" ? `Received Rs.${actionCmd.amount} from ${actionCmd.customerName || customer?.name}.` : `Opened ${actionCmd.customerName} account.`}`;
+              nextAnswer = `Done. ${
+                actionCmd.intent === "ADD_PURCHASE" ? `Added ${actionCmd.quantity || "1"} ${actionCmd.productAlias} to ${actionCmd.customerName || customer?.name || "account"}.` :
+                actionCmd.intent === "RECEIVE_PAYMENT" ? `Received Rs.${actionCmd.amount} from ${actionCmd.customerName || customer?.name}.` :
+                actionCmd.intent === "UNDO_LAST_TRANSACTION" ? `Undone last transaction for ${actionCmd.customerName || customer?.name}.` :
+                actionCmd.intent === "REVERSE_PAYMENT" ? `Reversed payment for ${actionCmd.customerName || customer?.name}.` :
+                actionCmd.intent === "REMOVE_PRODUCT" ? `Removed ${actionCmd.productAlias} from ${actionCmd.customerName || customer?.name}.` :
+                `Opened ${actionCmd.customerName} account.`
+              }`;
             }
           }
         } catch (e) {

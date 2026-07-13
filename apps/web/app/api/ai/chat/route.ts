@@ -79,6 +79,9 @@ Business Logic Rules:
    - OPEN_CUSTOMER: { "intent": "OPEN_CUSTOMER", "customerName": "..." }
    - ADD_PURCHASE: { "intent": "ADD_PURCHASE", "customerName": "...", "productAlias": "...", "quantity": "..." }
    - RECEIVE_PAYMENT: { "intent": "RECEIVE_PAYMENT", "customerName": "...", "amount": "..." }
+   - UNDO_LAST_TRANSACTION: { "intent": "UNDO_LAST_TRANSACTION", "customerName": "..." }
+   - REVERSE_PAYMENT: { "intent": "REVERSE_PAYMENT", "customerName": "...", "amount": "..." }
+   - REMOVE_PRODUCT: { "intent": "REMOVE_PRODUCT", "customerName": "...", "productAlias": "..." }
    - SEND_REMINDER: { "intent": "SEND_REMINDER", "customerName": "..." }
    - SHOW_REPORT: { "intent": "SHOW_REPORT" }
 
@@ -90,6 +93,9 @@ Business Logic Rules:
    More examples:
    - "open avinash account and add 1kg sugar" → Respond with natural language + action block for ADD_PURCHASE
    - "kumar paid 500 rupees" → Respond + action block for RECEIVE_PAYMENT
+   - "undo last transaction" → Respond + action block for UNDO_LAST_TRANSACTION
+   - "remove rice from avinash account" → Respond + action block for REMOVE_PRODUCT
+   - "reverse payment" → Respond + action block for REVERSE_PAYMENT
    - "how much is rice" → Just answer the price, NO action block
 
 Current Context:
