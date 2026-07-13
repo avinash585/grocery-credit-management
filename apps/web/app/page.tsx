@@ -3094,6 +3094,7 @@ function AIAssistant({
           nextAnswer = nextAnswer.replace(/```action[\s\S]*?```/, "").trim();
           // Always execute action commands from AI response
           if (actionCmd && actionCmd.intent) {
+            console.log("🎯 AI action detected:", actionCmd);
             // Show AI's natural language response first
             if (nextAnswer && nextAnswer.length >= 10) {
               setAnswer(nextAnswer);
@@ -3101,39 +3102,53 @@ function AIAssistant({
               setThinking(false);
               // Small delay to show AI response before executing
               await new Promise(resolve => setTimeout(resolve, 500));
+              setThinking(true); // Show thinking again during execution
             }
-            await onRunCommand(actionCmd);
-            // Update with completion message
-            if (!nextAnswer || nextAnswer.length < 10) {
-              nextAnswer = `✅ Done! ${
-                actionCmd.intent === "ADD_PURCHASE" ? `Added ${actionCmd.quantity || "1"} ${actionCmd.productAlias} to **${actionCmd.customerName || customer?.name || "account"}**.` :
-                actionCmd.intent === "RECEIVE_PAYMENT" ? `Received **Rs.${actionCmd.amount}** from **${actionCmd.customerName || customer?.name}**.` :
-                actionCmd.intent === "UNDO_LAST_TRANSACTION" ? `Undone last transaction for **${actionCmd.customerName || customer?.name}**.` :
-                actionCmd.intent === "REVERSE_PAYMENT" ? `Reversed payment for **${actionCmd.customerName || customer?.name}**.` :
-                actionCmd.intent === "REMOVE_PRODUCT" ? `Removed ${actionCmd.productAlias} from **${actionCmd.customerName || customer?.name}**.` :
-                `Opened **${actionCmd.customerName}** account.`
-              }`;
-            } else {
-              nextAnswer = "✅ " + nextAnswer;
+            
+            try {
+              await onRunCommand(actionCmd);
+              console.log("✅ AI action executed successfully");
+              // Update with completion message
+              if (!nextAnswer || nextAnswer.length < 10) {
+                nextAnswer = `✅ Done! ${
+                  actionCmd.intent === "ADD_PURCHASE" ? `Added ${actionCmd.quantity || "1"} ${actionCmd.productAlias} to **${actionCmd.customerName || customer?.name || "account"}**.` :
+                  actionCmd.intent === "RECEIVE_PAYMENT" ? `Received **Rs.${actionCmd.amount}** from **${actionCmd.customerName || customer?.name}**.` :
+                  actionCmd.intent === "UNDO_LAST_TRANSACTION" ? `Undone last transaction for **${actionCmd.customerName || customer?.name}**.` :
+                  actionCmd.intent === "REVERSE_PAYMENT" ? `Reversed payment for **${actionCmd.customerName || customer?.name}**.` :
+                  actionCmd.intent === "REMOVE_PRODUCT" ? `Removed ${actionCmd.productAlias} from **${actionCmd.customerName || customer?.name}**.` :
+                  `Opened **${actionCmd.customerName}** account.`
+                }`;
+              } else {
+                nextAnswer = "✅ " + nextAnswer;
+              }
+            } catch (execError) {
+              console.error("❌ Failed to execute AI action:", execError);
+              nextAnswer = `⚠️ ${nextAnswer || "Action failed to execute. Please try again."}`;
             }
           }
-        } catch (e) {
-          console.error("Failed to parse action from AI response:", e);
+        } catch (parseError) {
+          console.error("❌ Failed to parse action from AI response:", parseError);
+          console.log("Raw match:", match[1]);
           nextAnswer = `⚠️ ${nextAnswer || "I understood your request but couldn't execute it. Please try again."}`;
         }
       } else if (isAssistantMutationCommand(text) && !isAssistantInfoQuery(text)) {
         // If user clearly wants to do something but AI didn't provide action block,
         // try to parse and execute it directly
+        console.log("🔄 No action block from AI, trying fallback parsing for:", text);
         const fallbackAction = parseAssistantAction(text, customers, products, language, customer);
         if (fallbackAction) {
+          console.log("🎯 Fallback action detected:", fallbackAction);
           nextAnswer = nextAnswer || "Processing your request...";
           try {
             await onRunCommand(fallbackAction);
+            console.log("✅ Fallback action executed successfully");
             nextAnswer = "✅ " + nextAnswer;
-          } catch (e) {
-            console.error("Failed to execute fallback action:", e);
+          } catch (execError) {
+            console.error("❌ Failed to execute fallback action:", execError);
             nextAnswer = "⚠️ " + nextAnswer;
           }
+        } else {
+          console.log("ℹ️ No fallback action detected");
         }
       }
 
@@ -3166,8 +3181,14 @@ function AIAssistant({
         </div>
       </div>
       <div className="mt-4 space-y-2">
-        <AssistantBubble text={copy.whoOwesMost} />
-        <AssistantBubble text={copy.restockToday} />
+        <AssistantBubble 
+          text={copy.whoOwesMost} 
+          onClick={() => askQuestion(copy.whoOwesMost)}
+        />
+        <AssistantBubble 
+          text={copy.restockToday} 
+          onClick={() => askQuestion(copy.restockToday)}
+        />
         <AssistantBubble text={thinking ? copy.listening : answer === "Ready" ? copy.ready : answer || (status === "Ready" ? copy.ready : status)} speakable={true} language={language} />
       </div>
 
@@ -3333,7 +3354,7 @@ function StatusPill({ icon: Icon, label }: { icon: typeof ShieldCheck; label: st
   return <span className="flex min-h-11 items-center gap-2 rounded-md bg-white px-3 text-sm font-black shadow-sm"><Icon className="h-4 w-4 text-leaf-700" aria-hidden /> {label}</span>;
 }
 
-function AssistantBubble({ text, speakable, language }: { text: string; speakable?: boolean; language?: Language }) {
+function AssistantBubble({ text, speakable, language, onClick }: { text: string; speakable?: boolean; language?: Language; onClick?: () => void }) {
   const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => {
@@ -3384,13 +3405,21 @@ function AssistantBubble({ text, speakable, language }: { text: string; speakabl
     window.speechSynthesis.speak(utterance);
   }
 
+  const isClickable = Boolean(onClick);
+
   return (
-    <div className="relative rounded-md bg-leaf-50 p-3 pr-10 text-sm font-bold text-ink/75">
+    <div 
+      className={`relative rounded-md bg-leaf-50 p-3 pr-10 text-sm font-bold text-ink/75 ${isClickable ? "cursor-pointer hover:bg-leaf-100 transition-colors" : ""}`}
+      onClick={isClickable ? onClick : undefined}
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={isClickable ? (e) => { if (e.key === "Enter" || e.key === " ") onClick?.(); } : undefined}
+    >
       <p>{text}</p>
       {speakable && text && text !== "Ready" && text !== "Listening..." && text !== "Speech recognition is not available in this browser." && (
         <button
           type="button"
-          onClick={handleSpeak}
+          onClick={(e) => { e.stopPropagation(); handleSpeak(); }}
           className={`absolute right-2 top-2 p-1 rounded-full transition hover:bg-leaf-100 ${speaking ? "text-leaf-600 bg-leaf-100" : "text-ink/50"}`}
           title="Speak aloud"
           aria-label="Speak aloud"
