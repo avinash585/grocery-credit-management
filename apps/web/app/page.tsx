@@ -1739,9 +1739,12 @@ function RuralRetailOS() {
         if (!cmd || !cmd.intent) return;
         const transcriptText = [cmd.customerName, cmd.productAlias, cmd.quantity, cmd.amount, cmd.intent].filter(Boolean).join(" ");
         const rawText = "rawText" in cmd && typeof cmd.rawText === "string" ? cmd.rawText : "";
+        
+        // For any command, always pass through AI assistant to show what's happening
+        const question = rawText || transcript || transcriptText;
+        setAiQueryOverride(question);
+        
         if (isProductInfoQueryText(rawText || transcript || transcriptText)) {
-          const question = rawText || transcript || transcriptText;
-          setAiQueryOverride(question);
           setView("ai");
           setActiveTask("ai");
           setStatus(`Answering product question: "${question}"`);
@@ -1750,21 +1753,13 @@ function RuralRetailOS() {
         const enrichedCommand = parseLocalCommand(rawText || transcript || transcriptText, language);
         const commandToRun = enrichedCommand.intent !== "UNKNOWN" ? enrichedCommand : cmd;
         if (String(commandToRun.intent).toUpperCase() === "UNKNOWN") {
-          const question = rawText || transcript || transcriptText;
-          setAiQueryOverride(question);
           setView("ai");
           setActiveTask("ai");
           setStatus(`Answering with AI Command Center: "${question}"`);
           return;
         }
         setTranscript(rawText || transcript || commandToRun.intent);
-        // Always try direct execution first (auto-completes compound commands)
-        try {
-          await executeDirectCommand(commandToRun);
-        } catch {
-          // Fallback to guided mode
-          handleVoiceCommand(commandToRun);
-        }
+        // Commands are executed via AIAssistant component through aiQueryOverride
       }} />
     </main>
   );
