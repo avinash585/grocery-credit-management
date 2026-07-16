@@ -54,6 +54,13 @@ import {
 } from "@/lib/api";
 import { Language, t } from "@/lib/i18n";
 import { readQueue, useNetworkStatus, syncOfflineQueue } from "@/lib/offline";
+import {
+  analyzeAssistantCommand,
+  formatProductAnswer,
+  isAssistantActionText,
+  isAssistantInfoQueryText,
+  resolveAssistantProduct
+} from "@/lib/assistant-command-engine";
 
 const queryClient = new QueryClient();
 type Task = "credit" | "payment" | "products" | "ai";
@@ -851,16 +858,11 @@ function RuralRetailOS() {
   }
 
   function normalizeVoiceText(text: string) {
-    return text.toLowerCase().trim().replace(/[.,!?_\-]/g, " ").replace(/\s+/g, " ");
+    return text.toLowerCase().trim().replace(/[.,!?_-]/g, " ").replace(/\s+/g, " ");
   }
 
   function isProductInfoQueryText(text: string) {
-    const normalized = normalizeVoiceText(text);
-    return /\b(price|rate|cost|mrp|stock|available|availability|how much|what is|tell me|show me)\b/.test(normalized)
-      || normalized.includes("விலை")
-      || normalized.includes("இருப்பு")
-      || normalized.includes("எவ்வளவு")
-      || normalized.includes("கிடைக்குமா");
+    return isAssistantInfoQueryText(text);
   }
 
   function isExplicitPurchaseCommandText(text: string) {
@@ -901,7 +903,8 @@ function RuralRetailOS() {
   }
 
   function resolveProductFromVoice(alias: string | undefined, fullText: string, lang: Language) {
-    const resolution = resolveProductEntity(`${alias ?? ""} ${fullText}`, products, lang);
+    void lang;
+    const resolution = resolveAssistantProduct(`${alias ?? ""} ${fullText}`, products);
     return resolution.product;
   }
 
@@ -953,6 +956,23 @@ function RuralRetailOS() {
 
   function parseLocalCommand(text: string, lang: Language) {
     const normalized = normalizeVoiceText(text);
+    const analysis = analyzeAssistantCommand(text, customers, products, lang, selectedCustomer);
+    if (analysis.command) {
+      return analysis.command;
+    }
+    if (analysis.intent === "GET_PRODUCT_PRICE" || analysis.intent === "GET_STOCK" || analysis.isQuery) {
+      return {
+        intent: "UNKNOWN",
+        slots: {
+          confidence: analysis.confidence,
+          detectedLanguage: lang,
+          normalizedText: normalized,
+          raw: text,
+          productConfidence: analysis.productResolution.confidence,
+          alternatives: analysis.productResolution.alternatives.map((item) => item.name)
+        }
+      };
+    }
     let intent = "UNKNOWN";
     if (normalized.includes("open") || normalized.includes("account") || normalized.includes("khata") || normalized.includes("खोल") || normalized.includes("திற") || normalized.includes("கணக்கு")) {
       intent = "OPEN_CUSTOMER";
@@ -1310,6 +1330,66 @@ function RuralRetailOS() {
     }
   }
 
+  async function executeVoiceTranscript(text: string) {
+    const spoken = text.trim();
+    if (!spoken) return;
+
+    if (isProductInfoQueryText(spoken)) {
+      setAiQueryOverride(spoken);
+      setView("ai");
+      setActiveTask("ai");
+      setStatus(`Answering product question: "${spoken}"`);
+      return;
+    }
+
+    setBusy(true);
+    setStatus(`Understanding voice command: "${spoken}"`);
+    try {
+      const cmd = parseLocalCommand(spoken, language);
+      const intent = String(cmd.intent ?? "UNKNOWN").toUpperCase();
+
+      if (intent === "UNKNOWN") {
+        setView("ai");
+        setActiveTask("ai");
+        setAiQueryOverride(spoken);
+        setStatus(`I heard "${spoken}", but I could not identify a shop action. Try: add 1 litre milk to Avinash account.`);
+        return;
+      }
+
+      if (intent === "ADD_PURCHASE") {
+        if (!cmd.customerName && !selectedCustomer) {
+          setStatus(`I heard "${spoken}", but I could not identify the customer. Say: add milk to Avinash account.`);
+          setView("customers");
+          return;
+        }
+        if (!cmd.productAlias) {
+          setStatus(`I heard "${spoken}", but I could not identify the product. Say the exact item name.`);
+          setView("products");
+          return;
+        }
+      }
+
+      if (intent === "RECEIVE_PAYMENT") {
+        if (!cmd.customerName && !selectedCustomer) {
+          setStatus(`I heard "${spoken}", but I could not identify who paid.`);
+          setView("customers");
+          return;
+        }
+        if (!cmd.amount || Number(cmd.amount) <= 0) {
+          setStatus(`I heard "${spoken}", but I could not identify the payment amount.`);
+          return;
+        }
+      }
+
+      await executeDirectCommand(cmd);
+    } catch (error) {
+      console.error("Voice execution failed:", error);
+      setStatus("Voice command was detected, but execution failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function handleVoiceCommand(cmd: {
     intent: string;
     customerName?: string;
@@ -1641,46 +1721,7 @@ function RuralRetailOS() {
             }}
             onRunCommand={async () => {
               if (transcript.trim()) {
-                if (isProductInfoQueryText(transcript.trim())) {
-                  setAiQueryOverride(transcript.trim());
-                  setView("ai");
-                  setActiveTask("ai");
-                  setStatus(`Answering product question: "${transcript.trim()}"`);
-                  return;
-                }
-                setBusy(true);
-                setStatus("Parsing transaction command...");
-                try {
-                  let cmd = null;
-                  if (!demoMode && navigator.onLine) {
-                    try {
-                      cmd = await parseVoiceCommand(transcript.trim(), language);
-                    } catch (e) {
-                      console.log("Online parsing unavailable, using local parser.");
-                    }
-                  }
-                  if (!cmd) {
-                    cmd = parseLocalCommand(transcript.trim(), language);
-                  }
-
-                  if (cmd) {
-                    const confidence = cmd.slots?.confidence ?? 0.85;
-                    if (confidence >= 0.95) {
-                      await executeDirectCommand(cmd);
-                    } else if (confidence >= 0.80) {
-                      handleVoiceCommand(cmd);
-                    } else {
-                      setStatus("Confidence too low. Please repeat your query clearly.");
-                      setLearningWord(transcript.trim());
-                    }
-                  } else {
-                    setStatus("Could not parse command. Try using format like: 'Kumar Stores payment 500 rupees'.");
-                  }
-                } catch (error) {
-                  setStatus("Failed to parse command.");
-                } finally {
-                  setBusy(false);
-                }
+                await executeVoiceTranscript(transcript.trim());
               }
             }}
           />
@@ -1739,27 +1780,9 @@ function RuralRetailOS() {
         if (!cmd || !cmd.intent) return;
         const transcriptText = [cmd.customerName, cmd.productAlias, cmd.quantity, cmd.amount, cmd.intent].filter(Boolean).join(" ");
         const rawText = "rawText" in cmd && typeof cmd.rawText === "string" ? cmd.rawText : "";
-        
-        // For any command, always pass through AI assistant to show what's happening
         const question = rawText || transcript || transcriptText;
-        setAiQueryOverride(question);
-        
-        if (isProductInfoQueryText(rawText || transcript || transcriptText)) {
-          setView("ai");
-          setActiveTask("ai");
-          setStatus(`Answering product question: "${question}"`);
-          return;
-        }
-        const enrichedCommand = parseLocalCommand(rawText || transcript || transcriptText, language);
-        const commandToRun = enrichedCommand.intent !== "UNKNOWN" ? enrichedCommand : cmd;
-        if (String(commandToRun.intent).toUpperCase() === "UNKNOWN") {
-          setView("ai");
-          setActiveTask("ai");
-          setStatus(`Answering with AI Command Center: "${question}"`);
-          return;
-        }
-        setTranscript(rawText || transcript || commandToRun.intent);
-        // Commands are executed via AIAssistant component through aiQueryOverride
+        setTranscript(question);
+        await executeVoiceTranscript(question);
       }} />
     </main>
   );
@@ -2803,25 +2826,11 @@ function extractQuantityAndUnit(text: string) {
 }
 
 function isAssistantInfoQuery(text: string) {
-  const normalized = normalizeAssistantText(text);
-  return /\b(price|rate|cost|mrp|stock|available|availability|how much|what is|tell me|show me)\b/.test(normalized)
-    || normalized.includes("விலை")
-    || normalized.includes("இருப்பு")
-    || normalized.includes("எவ்வளவு")
-    || normalized.includes("கிடைக்குமா");
+  return isAssistantInfoQueryText(text);
 }
 
 function isAssistantMutationCommand(text: string) {
-  const normalized = normalizeAssistantText(text);
-  return /\b(add|put|give|credit|sale|sold|purchase|bought|bill|record|save|write|enter|log|receive|received|paid|payment|send reminder|remind|open account|open|undo|reverse|cancel|remove|delete)\b/.test(normalized)
-    || normalized.includes("கடன்")
-    || normalized.includes("சேர்")
-    || normalized.includes("போடு")
-    || normalized.includes("கொடு")
-    || normalized.includes("பணம்")
-    || normalized.includes("திற")
-    || normalized.includes("நீக்கு")
-    || normalized.includes("ரத்து");
+  return isAssistantActionText(text);
 }
 
 function findCatalogProductForQuestion(text: string, products: Product[], language: Language) {
@@ -2829,6 +2838,10 @@ function findCatalogProductForQuestion(text: string, products: Product[], langua
 }
 
 function localProductQueryAnswer(text: string, products: Product[], language: Language) {
+  const analysis = analyzeAssistantCommand(text, [], products, language, null);
+  if (analysis.intent === "GET_PRODUCT_PRICE" || analysis.intent === "GET_STOCK") {
+    return formatProductAnswer(analysis, language);
+  }
   if (!isAssistantInfoQuery(text) || isAssistantMutationCommand(text)) return null;
   const resolution = resolveProductEntity(text, products, language);
   const product = resolution.product;
@@ -2876,6 +2889,10 @@ function extractAssistantQuantity(text: string) {
 }
 
 function parseAssistantAction(text: string, customers: Customer[], products: Product[], language: Language, activeCustomer: Customer | null) {
+  const analysis = analyzeAssistantCommand(text, customers, products, language, activeCustomer);
+  if (analysis.command && !analysis.isQuery) {
+    return analysis.command;
+  }
   const normalized = normalizeAssistantText(text);
   const customer = findMentionedCustomer(text, customers) ?? activeCustomer;
   const product = findMentionedProduct(text, products, language);
