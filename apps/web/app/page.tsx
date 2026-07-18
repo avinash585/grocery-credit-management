@@ -1476,12 +1476,7 @@ function RuralRetailOS() {
       );
 
       // Update context manager with user message
-      contextManager.addMessage(SESSION_ID, {
-        role: "user",
-        content: query,
-        timestamp: Date.now(),
-        language,
-      });
+      contextManager.addMessage(SESSION_ID, "user", query);
 
       console.log("🎯 Intent Classification:", classification);
       console.log("📦 Extracted Entities:", entities);
