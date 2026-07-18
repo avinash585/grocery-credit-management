@@ -194,15 +194,20 @@ export function resolveAssistantProduct(text: string, products: Product[]): Prod
   const best = scored[0];
   if (!best) return { product: null, confidence: 0, alternatives: [] };
 
-  const alternatives = scored
+  const closeAlternatives = scored
     .filter((item) => item.product.id !== best.product.id && best.score - item.score < 0.08)
     .map((item) => item.product)
     .slice(0, 4);
 
+  // Return best product if score is high enough OR if it's significantly better than alternatives
+  const returnProduct =
+    best.score >= 0.9 ||
+    (best.score >= 0.7 && closeAlternatives.length === 0);
+
   return {
-    product: best.score >= 0.9 && alternatives.length === 0 ? best.product : null,
+    product: returnProduct ? best.product : null,
     confidence: best.score,
-    alternatives: [best.product, ...alternatives].slice(0, 5),
+    alternatives: [best.product, ...closeAlternatives].slice(0, 5),
     matchedTerm: best.matchedTerm
   };
 }

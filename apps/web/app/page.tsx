@@ -3159,14 +3159,16 @@ function resolveProductEntity(text: string, products: Product[], language: Langu
 
   const best = scored[0];
   if (!best) return { product: null, confidence: 0, alternatives: [] };
-  const alternatives = scored
+  const closeAlternatives = scored
     .filter((item) => item.product.id !== best.product.id && best.score - item.score < 0.04)
     .map((item) => item.product)
     .slice(0, 3);
+  // Return best product when score is high enough, even with close alternatives
+  const returnProduct = best.score >= 0.9 || (best.score >= 0.7 && closeAlternatives.length === 0);
   return {
-    product: best.score >= 0.9 && alternatives.length === 0 ? best.product : null,
+    product: returnProduct ? best.product : null,
     confidence: best.score,
-    alternatives: [best.product, ...alternatives].slice(0, 4),
+    alternatives: [best.product, ...closeAlternatives].slice(0, 4),
     matchedTerm: best.matchedTerm
   };
 }
@@ -3478,128 +3480,130 @@ function AIAssistant({
     setThinking(true);
     setAnswer("🤔 " + copy.listening);
     try {
-      const actionCommand = !isAssistantInfoQuery(text)
-        ? parseAssistantAction(text, customers, products, language, customer)
-        : null;
-      if (actionCommand) {
-        const confirmation = actionCommand.intent === "ADD_PURCHASE"
-          ? `📦 Adding ${actionCommand.quantity ?? "1"} ${actionCommand.productAlias ?? "product"} to **${actionCommand.customerName ?? "current customer"}** account...`
-          : actionCommand.intent === "RECEIVE_PAYMENT"
-            ? `💰 Recording **Rs.${actionCommand.amount ?? "0"}** payment from **${actionCommand.customerName ?? "current customer"}**...`
-            : actionCommand.intent === "UNDO_LAST_TRANSACTION"
-              ? `↩️ Undoing last transaction for **${actionCommand.customerName ?? "current customer"}**...`
+      const q = text.trim();
+
+      // ── 1. ACTION COMMANDS (add, pay, open, undo) ─────────────────────────
+      if (!isAssistantInfoQuery(q)) {
+        const actionCommand = parseAssistantAction(q, customers, products, language, customer);
+        if (actionCommand) {
+          const confirmation =
+            actionCommand.intent === "ADD_PURCHASE"
+              ? `📦 Adding ${actionCommand.quantity ?? "1"} × ${actionCommand.productAlias ?? "product"} to **${actionCommand.customerName ?? "current account"}**…`
+              : actionCommand.intent === "RECEIVE_PAYMENT"
+              ? `💰 Recording ₹${actionCommand.amount ?? "0"} payment from **${actionCommand.customerName ?? "current account"}**…`
+              : actionCommand.intent === "UNDO_LAST_TRANSACTION"
+              ? `↩️ Undoing last transaction for **${actionCommand.customerName ?? "current account"}**…`
               : actionCommand.intent === "REVERSE_PAYMENT"
-                ? `🔄 Reversing payment for **${actionCommand.customerName ?? "current customer"}**...`
-                : actionCommand.intent === "REMOVE_PRODUCT"
-                  ? `🗑️ Removing ${actionCommand.productAlias ?? "product"} from **${actionCommand.customerName ?? "current customer"}** account...`
-                  : `👤 Opening **${actionCommand.customerName ?? "customer"}** account...`;
-        setAnswer(confirmation);
-        setStatus(confirmation);
-        await onRunCommand(actionCommand);
-        return;
+              ? `🔄 Reversing payment for **${actionCommand.customerName ?? "current account"}**…`
+              : actionCommand.intent === "REMOVE_PRODUCT"
+              ? `🗑️ Removing ${actionCommand.productAlias ?? "product"} from **${actionCommand.customerName ?? "current account"}**…`
+              : `👤 Opening **${actionCommand.customerName ?? "customer"}** account…`;
+          setAnswer(confirmation);
+          setStatus(confirmation);
+          await onRunCommand(actionCommand);
+          setAnswer("✅ Done! " + confirmation.replace("…", "."));
+          return;
+        }
       }
 
-      const localCatalogAnswer = localProductQueryAnswer(text, products, language);
+      // ── 2. MULTI-PRODUCT PRICE QUERY (e.g. "cost of 1kg rice and 1L milk") ─
+      const andMatch = q.match(/\band\b|\+|,/i);
+      if (andMatch && /\b(price|cost|rate|how much)\b/i.test(q)) {
+        // Split on "and"/","/"+", try to resolve each segment
+        const parts = q.split(/\band\b|,|\+/i).map(s => s.trim()).filter(Boolean);
+        const answers: string[] = [];
+        let totalCost = 0;
+        for (const part of parts) {
+          const res = resolveProductEntity(part, products, language);
+          if (res.product) {
+            const { quantity } = extractQuantityAndUnit(part);
+            const qty = Number(quantity ?? "1");
+            const price = Number(res.product.sellingPrice ?? "0");
+            const unit = res.product.unit ?? "unit";
+            const name = getProductName(res.product, language);
+            if (qty > 1) {
+              const subtotal = price * qty;
+              totalCost += subtotal;
+              answers.push(`${qty} ${unit} of ${name} = ₹${subtotal.toFixed(2)}`);
+            } else {
+              totalCost += price;
+              answers.push(`${name} = ₹${price.toFixed(2)} per ${unit}`);
+            }
+          }
+        }
+        if (answers.length > 0) {
+          const breakdown = answers.join("\n");
+          const totalLine = answers.length > 1 ? `\nTotal: ₹${totalCost.toFixed(2)}` : "";
+          const reply = `💰 Price breakdown:\n${breakdown}${totalLine}`;
+          setAnswer(reply);
+          setStatus(reply.replace(/\n/g, " | "));
+          return;
+        }
+      }
+
+      // ── 3. SINGLE PRODUCT PRICE / STOCK QUERY ────────────────────────────
+      const localCatalogAnswer = localProductQueryAnswer(q, products, language);
       if (localCatalogAnswer) {
         setAnswer("📋 " + localCatalogAnswer);
-        setStatus(localCatalogAnswer);
+        setStatus(localCatalogAnswer.replace(/\*\*/g, ""));
         return;
       }
 
-      const businessAnswer = localBusinessAnswer(text, customers, products, todaySales, todayCredit, todayPayments, language);
+      // ── 4. BUSINESS DATA QUERY (sales, debtors, stock) ───────────────────
+      const businessAnswer = localBusinessAnswer(q, customers, products, todaySales, todayCredit, todayPayments, language);
       if (businessAnswer) {
         setAnswer("📊 " + businessAnswer);
         setStatus(businessAnswer);
         return;
       }
 
+      // ── 5. GEMINI FALLBACK for complex/unknown queries ────────────────────
       const response = await chatWithAi({
-        message: text,
+        message: q,
         language,
         customerName: customer?.name,
         outstandingBalance: customer?.outstandingBalance,
         transcript,
         customers,
-        products: products.map(p => ({
-          ...p,
-          name: getProductName(p, language)
-        }))
+        products: products.map(p => ({ ...p, name: getProductName(p, language) }))
       });
+
       let nextAnswer = response?.answer ?? localAiAnswer(copy, customer);
-      
-      // Look for embedded structured command block
+
+      // Parse embedded action block from Gemini response
       const match = nextAnswer.match(/```action\s*([\s\S]*?)\s*```/);
       if (match) {
         try {
           const actionCmd = JSON.parse(match[1]);
           nextAnswer = nextAnswer.replace(/```action[\s\S]*?```/, "").trim();
-          // Always execute action commands from AI response
-          if (actionCmd && actionCmd.intent) {
-            console.log("🎯 AI action detected:", actionCmd);
-            // Show AI's natural language response first
-            if (nextAnswer && nextAnswer.length >= 10) {
-              setAnswer(nextAnswer);
-              setStatus(nextAnswer);
-              setThinking(false);
-              // Small delay to show AI response before executing
-              await new Promise(resolve => setTimeout(resolve, 500));
-              setThinking(true); // Show thinking again during execution
-            }
-            
-            try {
-              await onRunCommand(actionCmd);
-              console.log("✅ AI action executed successfully");
-              // Update with completion message
-              if (!nextAnswer || nextAnswer.length < 10) {
-                nextAnswer = `✅ Done! ${
-                  actionCmd.intent === "ADD_PURCHASE" ? `Added ${actionCmd.quantity || "1"} ${actionCmd.productAlias} to **${actionCmd.customerName || customer?.name || "account"}**.` :
-                  actionCmd.intent === "RECEIVE_PAYMENT" ? `Received **Rs.${actionCmd.amount}** from **${actionCmd.customerName || customer?.name}**.` :
-                  actionCmd.intent === "UNDO_LAST_TRANSACTION" ? `Undone last transaction for **${actionCmd.customerName || customer?.name}**.` :
-                  actionCmd.intent === "REVERSE_PAYMENT" ? `Reversed payment for **${actionCmd.customerName || customer?.name}**.` :
-                  actionCmd.intent === "REMOVE_PRODUCT" ? `Removed ${actionCmd.productAlias} from **${actionCmd.customerName || customer?.name}**.` :
-                  `Opened **${actionCmd.customerName}** account.`
-                }`;
-              } else {
-                nextAnswer = "✅ " + nextAnswer;
-              }
-            } catch (execError) {
-              console.error("❌ Failed to execute AI action:", execError);
-              nextAnswer = `⚠️ ${nextAnswer || "Action failed to execute. Please try again."}`;
-            }
+          if (actionCmd?.intent) {
+            setAnswer(nextAnswer || "Processing…");
+            setThinking(false);
+            await new Promise(r => setTimeout(r, 400));
+            setThinking(true);
+            await onRunCommand(actionCmd);
+            nextAnswer = "✅ " + (nextAnswer || "Done!");
           }
-        } catch (parseError) {
-          console.error("❌ Failed to parse action from AI response:", parseError);
-          console.log("Raw match:", match[1]);
-          nextAnswer = `⚠️ ${nextAnswer || "I understood your request but couldn't execute it. Please try again."}`;
+        } catch {
+          nextAnswer = nextAnswer || "I understood but couldn't execute. Please try again.";
         }
-      } else if (isAssistantMutationCommand(text) && !isAssistantInfoQuery(text)) {
-        // If user clearly wants to do something but AI didn't provide action block,
-        // try to parse and execute it directly
-        console.log("🔄 No action block from AI, trying fallback parsing for:", text);
-        const fallbackAction = parseAssistantAction(text, customers, products, language, customer);
+      } else if (isAssistantMutationCommand(q) && !isAssistantInfoQuery(q)) {
+        const fallbackAction = parseAssistantAction(q, customers, products, language, customer);
         if (fallbackAction) {
-          console.log("🎯 Fallback action detected:", fallbackAction);
-          nextAnswer = nextAnswer || "Processing your request...";
-          try {
-            await onRunCommand(fallbackAction);
-            console.log("✅ Fallback action executed successfully");
-            nextAnswer = "✅ " + nextAnswer;
-          } catch (execError) {
-            console.error("❌ Failed to execute fallback action:", execError);
-            nextAnswer = "⚠️ " + nextAnswer;
-          }
-        } else {
-          console.log("ℹ️ No fallback action detected");
+          await onRunCommand(fallbackAction);
+          nextAnswer = "✅ " + nextAnswer;
         }
       }
 
       setAnswer(nextAnswer);
-      setStatus(nextAnswer);
+      setStatus(nextAnswer.replace(/\*\*/g, ""));
     } catch (error) {
       console.error("AI query error:", error);
-      const nextAnswer = "⚠️ " + localAiAnswer(copy, customer);
-      setAnswer(nextAnswer);
-      setStatus(nextAnswer);
+      const fallback = localProductQueryAnswer(text, products, language)
+        ?? localBusinessAnswer(text, customers, products, todaySales, todayCredit, todayPayments, language)
+        ?? localAiAnswer(copy, customer);
+      setAnswer("⚠️ " + fallback);
+      setStatus(fallback);
     } finally {
       setThinking(false);
     }
@@ -3856,7 +3860,19 @@ function AssistantBubble({ text, speakable, language, onClick }: { text: string;
       tabIndex={isClickable ? 0 : undefined}
       onKeyDown={isClickable ? (e) => { if (e.key === "Enter" || e.key === " ") onClick?.(); } : undefined}
     >
-      <p>{text}</p>
+      <div>
+        {text.split("\n").map((line, i) => {
+          // Render **bold** text
+          const parts = line.split(/\*\*(.*?)\*\*/g);
+          return (
+            <p key={i} className={i > 0 ? "mt-1" : ""}>
+              {parts.map((part, j) =>
+                j % 2 === 1 ? <strong key={j}>{part}</strong> : part
+              )}
+            </p>
+          );
+        })}
+      </div>
       {speakable && text && text !== "Ready" && text !== "Listening..." && text !== "Speech recognition is not available in this browser." && (
         <button
           type="button"
