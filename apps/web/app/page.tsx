@@ -1602,27 +1602,23 @@ function RuralRetailOS() {
         setView("billing");
         setActiveTask("credit");
 
-        // Find product
-        let productToAdd = selectedProduct;
-        
+        // Find and add product
         if (entities.products && entities.products.length > 0) {
-          productToAdd = entities.products[0].product;
+          const productToAdd: Product = entities.products[0].product as Product;
           setSelectedProduct(productToAdd);
-          
           const qty = entities.products[0].quantity?.toString() || "1";
           setVoiceQuantity(qty);
           await executeSaveCredit(productToAdd, qty);
           setStatus(`✅ Added ${qty} ${productToAdd.name} to ${resolvedCreditCustomer.name}'s account`);
-          
+
         } else if (originalCmd.productAlias) {
           const alias = originalCmd.productAlias.toLowerCase().trim();
           const matchedProduct = resolveProductFromVoice(alias, alias, language);
           if (matchedProduct) {
-            productToAdd = matchedProduct;
             setSelectedProduct(matchedProduct);
             const qty = originalCmd.quantity || "1";
             setVoiceQuantity(qty);
-            await executeSaveCredit(productToAdd, qty);
+            await executeSaveCredit(matchedProduct, qty);
             setStatus(`✅ Added ${qty} ${matchedProduct.name} to ${resolvedCreditCustomer.name}'s account`);
           } else {
             setStatus(`❌ Product not found: "${originalCmd.productAlias}"`);
