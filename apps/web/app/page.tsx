@@ -1457,12 +1457,9 @@ function RuralRetailOS() {
     if (!cmd || !cmd.intent) return;
 
     try {
-      // Build context from current session state
-      const conversationContext = contextManager.buildContext(
-        selectedCustomer || undefined,
-        customers,
-        products
-      );
+      // Get or create context session
+      const SESSION_ID = "main";
+      const conversationContext = contextManager.getOrCreateSession(SESSION_ID, language);
 
       // Reconstruct original query from command
       const query = reconstructQuery(cmd);
@@ -1478,8 +1475,8 @@ function RuralRetailOS() {
         products
       );
 
-      // Update context manager
-      contextManager.addMessage({
+      // Update context manager with user message
+      contextManager.addMessage(SESSION_ID, {
         role: "user",
         content: query,
         timestamp: Date.now(),
@@ -1545,7 +1542,7 @@ function RuralRetailOS() {
         if (entities.customers && entities.customers.length > 0) {
           const customer = entities.customers[0].customer;
           openCustomer(customer);
-          contextManager.setActiveCustomer(customer.id);
+          contextManager.setActiveCustomer("main", customer);
           setStatus(`✅ Opened ${customer.name}'s account`);
         } else if (originalCmd.customerName) {
           const query = originalCmd.customerName.toLowerCase().trim();
@@ -1553,7 +1550,7 @@ function RuralRetailOS() {
                         customers.find(c => c.name.toLowerCase().includes(query));
           if (matched) {
             openCustomer(matched);
-            contextManager.setActiveCustomer(matched.id);
+            contextManager.setActiveCustomer("main", matched);
             setStatus(`✅ Opened ${matched.name}'s account`);
           } else {
             setStatus(`❌ No customer found: "${originalCmd.customerName}"`);
@@ -1587,7 +1584,7 @@ function RuralRetailOS() {
             (!selectedCustomer || selectedCustomer.id !== entities.customers[0].customer.id)) {
           creditCustomer = entities.customers[0].customer;
           openCustomer(creditCustomer);
-          contextManager.setActiveCustomer(creditCustomer.id);
+          contextManager.setActiveCustomer("main", creditCustomer);
         } else if (originalCmd.customerName && !creditCustomer) {
           const query = originalCmd.customerName.toLowerCase().trim();
           const matched = findCustomerFuzzy(originalCmd.customerName) ?? 
@@ -1595,7 +1592,7 @@ function RuralRetailOS() {
           if (matched) {
             creditCustomer = matched;
             openCustomer(matched);
-            contextManager.setActiveCustomer(matched.id);
+            contextManager.setActiveCustomer("main", matched);
           }
         }
 
@@ -1614,7 +1611,6 @@ function RuralRetailOS() {
         if (entities.products && entities.products.length > 0) {
           productToAdd = entities.products[0].product;
           setSelectedProduct(productToAdd);
-          contextManager.setActiveProduct(productToAdd.id);
           
           // Get quantity from entity or default to 1
           const qty = entities.products[0].quantity?.toString() || "1";
@@ -1630,7 +1626,6 @@ function RuralRetailOS() {
           if (matchedProduct) {
             productToAdd = matchedProduct;
             setSelectedProduct(matchedProduct);
-            contextManager.setActiveProduct(matchedProduct.id);
             
             const qty = originalCmd.quantity || "1";
             setVoiceQuantity(qty);
@@ -1653,7 +1648,7 @@ function RuralRetailOS() {
             (!selectedCustomer || selectedCustomer.id !== entities.customers[0].customer.id)) {
           paymentCustomer = entities.customers[0].customer;
           openCustomer(paymentCustomer);
-          contextManager.setActiveCustomer(paymentCustomer.id);
+          contextManager.setActiveCustomer("main", paymentCustomer);
         } else if (originalCmd.customerName && !paymentCustomer) {
           const query = originalCmd.customerName.toLowerCase().trim();
           const matched = findCustomerFuzzy(originalCmd.customerName) ?? 
@@ -1661,7 +1656,7 @@ function RuralRetailOS() {
           if (matched) {
             paymentCustomer = matched;
             openCustomer(matched);
-            contextManager.setActiveCustomer(matched.id);
+            contextManager.setActiveCustomer("main", matched);
           }
         }
 
