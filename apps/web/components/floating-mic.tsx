@@ -38,7 +38,7 @@ type ParsedCommand = {
 const langCodes: Record<Language, string> = {
   ENGLISH: "en-IN", TAMIL: "ta-IN", HINDI: "hi-IN",
   TELUGU: "te-IN",  KANNADA: "kn-IN", MALAYALAM: "ml-IN",
-  TANGLISH: "en-IN", HINGLISH: "en-IN", // Code-switched languages use English voice
+  TANGLISH: "en-IN", HINGLISH: "en-IN",
 };
 
 // ─── UI copy per language ─────────────────────────────────────────────────────
@@ -65,7 +65,7 @@ const productKeywords: Array<{ keys: string[]; alias: string }> = [
   { keys:["wheat","atta","godumai","கோதுமை","gehun","గోధుమ","ಗೋಧಿ","ഗോതമ്പ്","chapati","roti atta"], alias:"Wheat Atta" },
   { keys:["maida","மைதா","మైదా","ಮೈದಾ","refined flour","all purpose flour"], alias:"Maida" },
   { keys:["rava","sooji","suji","semolina","சூஜி","ரவா","రవ్వ","ರವೆ","റവ"], alias:"Rava / Sooji" },
-  { keys:["besan","kadalai mavu","gram flour","బెసన్","ಕಡಲೆ ಹಿಟ್ಟు","കടലപ്പൊടி"], alias:"Besan" },
+  { keys:["besan","kadalai mavu","gram flour","బెసన్","ಕಡಲೆ ಹಿಟ್ಟು","കടലപ്പൊടി"], alias:"Besan" },
   { keys:["sugar","sakkarai","சர்க்கரை","chini","cheeni","చక్కెర","ಸಕ್ಕರೆ","പഞ്ചസാര","white sugar"], alias:"Sugar" },
   { keys:["jaggery","vellam","வெல்லம்","gud","bellam","బెల్లం","bella","ಬೆಲ್ಲ","sharkara","ശർക്കര"], alias:"Jaggery" },
   { keys:["salt","uppu","உப்பு","namak","ఉప్పు","ಉಪ್ಪು","ഉപ്പ്","iodized","tata salt"], alias:"Iodized Salt" },
@@ -83,8 +83,8 @@ const productKeywords: Array<{ keys: string[]; alias: string }> = [
   { keys:["coconut oil","thengai ennai","வெளிச்செண்ணெய்","nariyal tel","kobbari","కొబ్బరి","thenginaenne","ತೆಂಗಿನ","velichenna","വെളിച്ചെണ്ണ","parachute"], alias:"Coconut Oil" },
   { keys:["mustard oil","sarson","sarso","avala nune"], alias:"Mustard Oil" },
   { keys:["gingelly oil","sesame oil","nallennai","நல்லெண்ணெய்","nuvvula","నువ్వుల","yellu","ಎಳ್ಳಿನ","nallenna"], alias:"Gingelly Oil" },
-  { keys:["milk","paal","பால்","doodh","paalu","పాలు","halu","ಹಾಲು","paal","പാൽ","aavin","mother dairy","amul milk"], alias:"Milk" },
-  { keys:["butter","vennai","வெண்ணெய்","makhan","venna","వెన్న","benne","ಬೆಣ್ಣೆ","venna","amul butter"], alias:"Butter" },
+  { keys:["milk","paal","பால்","doodh","paalu","పాలు","halu","ಹಾಲು","പാൽ","aavin","mother dairy","amul milk"], alias:"Milk" },
+  { keys:["butter","vennai","வெண்ணெய்","makhan","venna","వెన్న","benne","ಬೆಣ್ಣೆ","amul butter"], alias:"Butter" },
   { keys:["ghee","nei","நெய்","desi ghee","neyyi","నేయి","tuppa","ತುಪ್ಪ","neyyv","നെയ്യ്","cow ghee"], alias:"Ghee" },
   { keys:["curd","yogurt","thayir","தயிர்","dahi","perugu","పెరుగు","mosaru","ಮೊಸರು","thairu","തൈര്"], alias:"Curd / Yogurt" },
   { keys:["paneer","panner","பனீர்","cottage cheese","పనీర్","ಪನೀರ್","പനീർ"], alias:"Paneer" },
@@ -125,10 +125,8 @@ const productKeywords: Array<{ keys: string[]; alias: string }> = [
 // 🧠 SLANG INTENT KEYWORDS
 // ═══════════════════════════════════════════════════════════════════════════════
 const INTENTS = {
-  // Includes: அக்கவுண்டில் (Tamil for "in the account") + கணக்கில்
   open:    ["open","account","khata","register","திற","கணக்கு","அக்கவுண்டில்","அக்கவுண்ட்","கணக்கில்","கணக்கு திற","திறக்க","खोल","खाता","तेरु","ఖాతా","ತೆರೆ","ಖಾತೆ","തുറ","അക്കൗണ്ട്","show","load","pull up","hisab"],
   pay:     ["paid","payment","received","pay","cash","settled","payed","கொடுத்தார்","பணம்","கட்டினார்","ரூபாய்","பணம் கொடுத்தார்","pay பண்ணினார்","செட்டில்","दिया","भुगतान","चुकाया","పైసలు","చెల్లించ","ಕೊಟ್ಟರು","ಪಾವತಿ","തന്നു","അടച്ചു"],
-  // Includes: ஆட் செய் (Tamil phonetic "add"), போடு (put/add), கிரெடிட் செய், வேண்டும்
   add:     ["add","credit","sale","sold","give","took","purchase","bought",
              "சேர்","கொடு","கடன்","போடு","வேண்டும்","குடு","வாங்கினார்","எடுத்தார்","சேர்க்க",
              "ஆட்","ஆட் செய்","ஆட் பண்ணு","ஆட் பண்ண","add செய்","add பண்ண","add பண்ணு",
@@ -150,15 +148,14 @@ const numberWords: Record<string,string> = {
   "ഒന്ന്":"1","onnu":"1","randu":"2","രണ്ട്":"2","moonnu_ml":"3","മൂന്ന്":"3","naalu_ml":"4","നാല്":"4",
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🧠 COMMAND PARSER — 10-pattern NLP engine
+// ═══════════════════════════════════════════════════════════════════════════════
 function parseCommand(text: string, language: Language): ParsedCommand {
   const raw = text.toLowerCase().trim().replace(/[.,!?_\-|]/g," ").replace(/\s+/g," ");
   const has = (kws: string[]) => kws.some(k => raw.includes(k.toLowerCase()));
-  const productInfoQuery = /\b(price|rate|cost|mrp|stock|available|availability|how much|what is|tell me|show me)\b/.test(raw)
-    || raw.includes("விலை")
-    || raw.includes("இருப்பு")
-    || raw.includes("எவ்வளவு")
-    || raw.includes("கிடைக்குமா");
 
+  // ── STEP 1: Detect intent ──────────────────────────────────────────────────
   let intent = "UNKNOWN";
   if      (has(INTENTS.confirm)) intent = "CONFIRM";
   else if (has(INTENTS.cancel))  intent = "CANCEL";
@@ -167,77 +164,124 @@ function parseCommand(text: string, language: Language): ParsedCommand {
   else if (has(INTENTS.balance)) intent = "ASK_BALANCE";
   else if (has(INTENTS.open))    intent = "OPEN_CUSTOMER";
   else if (has(INTENTS.add))     intent = "ADD_PURCHASE";
-  if (productInfoQuery) intent = "ASK_PRODUCT";
   if (has(INTENTS.open) && has(INTENTS.add)) intent = "ADD_PURCHASE";
 
-  // ── Customer name extraction ────────────────────────────────────────────
-  // Handles: Tamil script, Hindi, Telugu, Kannada, Malayalam + romanized names
-  const scriptRange = "\u0900-\u097F\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F";
-  const nameRe = `[a-z${scriptRange}]+(?:\\s[a-z${scriptRange}]+)?`;
-  const namePatterns = [
-    // "லட்சுமி அக்கவுண்டில்" / "லட்சுமி கணக்கில்" (Tamil: name + account-il)
-    new RegExp(`(${nameRe})\\s+(?:அக்கவுண்டில்|அக்கவுண்ட்|கணக்கில்|கணக்கு|account\\s*il|accountil)`, "i"),
-    // "Lakshmi account", "Rajesh khata"
-    new RegExp(`(${nameRe})\\s+(?:account|khata|ka\\s+khata|kannakku|khaate|a\/c)`, "i"),
-    // "open Lakshmi account"
-    new RegExp(`(?:open|திற|khol|teru|tere|thura|tihr)\\s+(${nameRe})\\s*(?:account|khata|kannakku|khaate|a\/c)?`, "i"),
-    // "Lakshmi's account"
-    new RegExp(`(${nameRe})'?s?\\s+account`, "i"),
-    // "for Lakshmi", "Lakshmi ku", "Lakshmi ke liye"
-    new RegExp(`(?:for|ke\\s+liye|ko|ku|ukku|ge|ige|nu|க்கு|கிட்ட)\\s+(${nameRe})`, "i"),
-    // "Lakshmi name followed by any account-related word"
-    new RegExp(`(${nameRe})\\s+(?:கணக்கு|account|khata|ఖాతా|ಖಾತೆ|അക്കൗണ്ട്)`, "i"),
-  ];
-  const skipWords = new Set(["the","a","an","on","in","of","to","and","or","add","give","open","show","get","check","rs","kg","litre","packet","one","two","three","account","oru","ek","ஒரு","rice","sugar","oil","dal","salt"]);
-  let customerName: string|undefined;
+  // Product info query detection
+  const isProductQuery = /\b(price|rate|cost|mrp|stock|available|availability|how much|what is|tell me|show me)\b/.test(raw)
+    || raw.includes("விலை") || raw.includes("இருப்பு") || raw.includes("எவ்வளவு");
+  if (isProductQuery && intent === "UNKNOWN") intent = "ASK_PRODUCT";
+
+  // ── STEP 2: Extract PRODUCT first (prevents product words leaking into name) ──
+  let productAlias: string | undefined;
+  let matchedProductKey = "";
+  for (const { keys, alias } of productKeywords) {
+    const hit = keys.find(k => raw.includes(k.toLowerCase()));
+    if (hit) { productAlias = alias; matchedProductKey = hit.toLowerCase(); break; }
+  }
+
+  // ── STEP 3: Extract CUSTOMER NAME ─────────────────────────────────────────
+  // All Indian script unicode ranges
+  const SR = "\u0900-\u097F\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F";
+  // One word (can be Indian script or Latin letters)
+  const W = `[a-z${SR}]+`;
+  // Name group: 1 or 2 words  (captured in group 1)
+  const NM = `(${W}(?:\\s${W})?)`;
+
+  // Build a comprehensive skip-word set
+  // These words CANNOT be a customer name
+  const productKeySet = new Set(productKeywords.flatMap(p => p.keys.map(k => k.toLowerCase())));
+  const SKIP = new Set([
+    "the","a","an","is","in","of","and","or","but","on","at","by","as","with",
+    "add","give","open","show","get","check","send","take","receive","pay","put","buy",
+    "account","khata","khaate","hisab","kannakku","balance","due","register",
+    "one","two","three","four","five","six","seven","eight","nine","ten","dozen",
+    "half","quarter","ek","do","oru","rendu","ondu","eradu","randu","onnu",
+    "rs","kg","kilo","gram","litre","liter","packet","pack","piece","pcs","ml",
+    "bottle","box","tin","credit","sale","sold","purchase","bought","payment",
+    "paid","settled","rupee","rupees","ruba","kaasu","paisa","now","please",
+    ...Array.from(productKeySet),
+  ]);
+
+  const isValidName = (n: string): boolean =>
+    n.length >= 2 &&
+    !SKIP.has(n.toLowerCase()) &&
+    !/^\d+$/.test(n) &&
+    !/^(litre?|liter?|kg|ml|gm|gram|pack|pcs|piece|rs)$/i.test(n) &&
+    // Reject if it equals the product keyword we found
+    !(matchedProductKey && n.toLowerCase() === matchedProductKey) &&
+    !(matchedProductKey && matchedProductKey.includes(n.toLowerCase()) && matchedProductKey.length <= n.length + 3);
+
+  // ── 10 Patterns — ordered most-specific to least-specific ─────────────────
+  // Pattern 1 [KEY FIX]: "add/give 1 litre milk TO Avinash [account]"
+  //   Action keywords + anything + "to" + NAME + optional account word
+  const p1 = new RegExp(
+    `(?:add|give|sold|credit|buy|put|sale)\\s+.*?\\bto\\s+${NM}(?:\\s+(?:account|khata|kannakku|khaate))?`,
+    "i"
+  );
+  // Pattern 2: "milk FOR Avinash" / "ke liye Avinash"
+  const p2 = new RegExp(`(?:for|ke\\s+liye)\\s+${NM}`, "i");
+  // Pattern 3: Tamil "அக்கவுண்டில்" suffix
+  const p3 = new RegExp(`${NM}\\s+(?:\u0b85\u0b95\u0bcd\u0b95\u0bb5\u0bc1\u0ba3\u0bcd\u0b9f\u0bbf\u0bb2\u0bcd|\u0b85\u0b95\u0bcd\u0b95\u0bb5\u0bc1\u0ba3\u0bcd\u0b9f\u0bcd|\u0b95\u0ba3\u0b95\u0bcd\u0b95\u0bbf\u0bb2\u0bcd|\u0b95\u0ba3\u0b95\u0bcd\u0b95\u0bc1|accountil)`, "i");
+  // Pattern 4: "Avinash account" / "Kumar khata"
+  const p4 = new RegExp(`${NM}\\s+(?:account|khata|khaate|kannakku|a\\/c|\u0c16\u0c3e\u0c24\u0c3e|\u0c96\u0cbe\u0ca4\u0cc6|\u0d05\u0d15\u0d4d\u0d15\u0d57\u0d23\u0d4d\u0d31\u0d4d|\u0b95\u0ba3\u0b95\u0bcd\u0b95\u0bc1|\u0916\u093e\u0924\u093e)`, "i");
+  // Pattern 5: "Avinash's account" / "Avinash's balance"
+  const p5 = new RegExp(`${NM}'?s?\\s+(?:account|balance|due|owe)`, "i");
+  // Pattern 6: "open Avinash" / "திற Lakshmi" / "show Kumar account"
+  const p6 = new RegExp(`(?:open|show|load|\u0ba4\u0bbf\u0bb1|khol|teru|tere|thura|tiru|tiruka)\\s+${NM}(?:\\s+(?:account|khata))?`, "i");
+  // Pattern 7: Telugu/Kannada/Malayalam account locative suffix
+  const p7 = new RegExp(`${NM}\\s+(?:\u0c16\u0c3e\u0c24\u0c3e\u0c32\u0c4b|\u0c96\u0cbe\u0ca4\u0cc6\u0caf\u0cb2\u0ccd\u0cb2\u0cbf|\u0d05\u0d15\u0d4d\u0d15\u0d57\u0d23\u0d4d\u0d31\u0d3f\u0d7d)`, "i");
+  // Pattern 8: Hindi "Avinash ke liye" / "Avinash ko" / "Avinash ka"
+  const p8 = new RegExp(`${NM}\\s+(?:ke\\s+liye|ko\\s|ka\\s|ki\\s)`, "i");
+  // Pattern 9: Tamil ku/kku/ukku postfix: "Avinash ku rice"
+  const p9 = new RegExp(`${NM}\\s+(?:ku|kku|ukku|\u0b95\u0bcd\u0b95\u0bc1|\u0b95\u0bbf\u0b9f\u0bcd\u0b9f)`, "i");
+  // Pattern 10: Last resort — bare "to NAME" anywhere in the sentence
+  const p10 = new RegExp(`\\bto\\s+${NM}`, "i");
+
+  const namePatterns = [p1, p2, p3, p4, p5, p6, p7, p8, p9, p10];
+
+  let customerName: string | undefined;
   for (const p of namePatterns) {
     const m = raw.match(p);
     if (m?.[1]) {
-      const n = m[1].trim();
-      if (n.length > 1 && !skipWords.has(n.toLowerCase())) { customerName = n; break; }
+      const candidate = m[1].trim();
+      if (isValidName(candidate)) { customerName = candidate; break; }
     }
   }
 
-  // ── Product ──────────────────────────────────────────────────────────────
-  let productAlias: string|undefined;
-  for (const {keys,alias} of productKeywords) {
-    if (keys.some(k => raw.includes(k.toLowerCase()))) { productAlias=alias; break; }
-  }
-
-  // ── Amount ────────────────────────────────────────────────────────────────
+  // ── STEP 4: Amount ────────────────────────────────────────────────────────
   const amtMatch = raw.match(/(?:rs\.?|rupees?|₹|ruba|kaasu|रुपये?|ரூபாய்|రూపాయ|ರೂಪಾಯಿ|രൂപ)?\s*(\d+(?:[.,]\d+)?)/);
   const amount = amtMatch ? amtMatch[1].replace(",",".") : undefined;
 
-  // ── Quantity ──────────────────────────────────────────────────────────────
-  const qtyMatch = raw.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilo|kilogram|gram|g\b|litre?|liter?|l\b|packet|pack|piece|pcs|pc\b|ml|bottle|box|tin|dozen|கிலோ|கிலோகிராம்|லிட்டர்)/);
-  let quantity: string|undefined;
+  // ── STEP 5: Quantity ──────────────────────────────────────────────────────
+  const qtyMatch = raw.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilo(?:gram)?s?|gram|g\b|litre?s?|liter?s?|l\b|packet|pack|piece|pcs|pc\b|ml|bottle|box|tin|dozen|கிலோ|கிலோகிராம்|லிட்டர்)/i);
+  let quantity: string | undefined;
   if (qtyMatch) {
     quantity = qtyMatch[1];
   } else {
-    for (const [w,v] of Object.entries(numberWords)) { if(raw.includes(w.toLowerCase())){quantity=v;break;} }
-    if (!quantity) { const n=raw.match(/\b(\d+)\b/); quantity=n?n[1]:"1"; }
+    for (const [w, v] of Object.entries(numberWords)) {
+      // skip ambiguous keys that could match product words
+      if (w === "moonnu_ml" || w === "naalu_ml") continue;
+      if (raw.includes(w.toLowerCase())) { quantity = v; break; }
+    }
+    if (!quantity) {
+      const numMatch = raw.match(/\b(\d+)\b/);
+      quantity = numMatch ? numMatch[1] : "1";
+    }
   }
 
-  // ── Smart fallback: if product found but intent still UNKNOWN ────────────
-  // e.g. "லட்சுமி அக்கவுண்டில் ஒரு கிலோ அரிசி" → clearly ADD_PURCHASE
-  if (intent === "UNKNOWN") {
-    if (!productInfoQuery && productAlias && customerName) intent = "ADD_PURCHASE";
-    else if (!productInfoQuery && productAlias && has(INTENTS.add)) intent = "ADD_PURCHASE";
-    else if (customerName)            intent = "OPEN_CUSTOMER";
+  // ── STEP 6: Smart intent upgrades ────────────────────────────────────────
+  // If action + product → definite ADD_PURCHASE
+  if (!isProductQuery && (has(INTENTS.open) || has(INTENTS.add)) && productAlias) {
+    intent = "ADD_PURCHASE";
   }
-  // If open + product detected → compound command → ADD_PURCHASE
-  if (!productInfoQuery && has(INTENTS.open) && has(INTENTS.add) && productAlias) intent = "ADD_PURCHASE";
-
-  // ── Smart fallback ──────────────────────────────────────────────────────
-  // If NLP couldn't detect intent but found a product and/or customer,
-  // infer the most likely intent automatically
+  // If intent still unknown, infer from entities found
   if (intent === "UNKNOWN") {
-    if (!productInfoQuery && productAlias && customerName) intent = "ADD_PURCHASE";
-    else if (!productInfoQuery && productAlias && has(INTENTS.add)) intent = "ADD_PURCHASE";
-    else if (customerName)            intent = "OPEN_CUSTOMER";
+    if (!isProductQuery && productAlias && customerName) intent = "ADD_PURCHASE";
+    else if (!isProductQuery && productAlias)            intent = "ADD_PURCHASE";
+    else if (customerName)                               intent = "OPEN_CUSTOMER";
   }
-  // Compound command: open account + product mentioned → ADD_PURCHASE
-  if (!productInfoQuery && has(INTENTS.add) && productAlias) intent = "ADD_PURCHASE";
+  // Payment: amount + payment keyword → RECEIVE_PAYMENT
+  if (has(INTENTS.pay) && amount && Number(amount) > 0) intent = "RECEIVE_PAYMENT";
 
   return { intent, customerName, productAlias, amount, quantity, rawText: text };
 }
@@ -263,7 +307,7 @@ function IntentCard({ cmd, language }: { cmd: ParsedCommand; language: Language 
     ADD_PURCHASE:"bg-amber-50 border-amber-200 text-amber-800",
     RECEIVE_PAYMENT:"bg-green-50 border-green-200 text-green-800",
     ASK_BALANCE:"bg-purple-50 border-purple-200 text-purple-800",
-    ASK_PRODUCT:"bg-leaf-50 border-leaf-200 text-leaf-800",
+    ASK_PRODUCT:"bg-teal-50 border-teal-200 text-teal-800",
     SHOW_REPORT:"bg-slate-50 border-slate-200 text-slate-800",
     UNKNOWN:"bg-red-50 border-red-200 text-red-700",
   };
@@ -443,7 +487,10 @@ export function FloatingMic({
 
             {/* ── IDLE ────────────────────────────────────────────────── */}
             {phase === "idle" && (
-              <p className="text-sm text-ink/50 text-center py-2">{uic.tapRecord}</p>
+              <div className="text-center py-2 space-y-1">
+                <p className="text-sm text-ink/50">{uic.tapRecord}</p>
+                <p className="text-[10px] text-ink/30">Try: "Add 1 litre milk to Avinash account"</p>
+              </div>
             )}
 
             {/* ── RECORDING ───────────────────────────────────────────── */}
@@ -535,7 +582,7 @@ export function FloatingMic({
             {/* Language pill */}
             <div className="flex items-center gap-1.5 border-t border-slate-100 pt-2">
               <div className={`h-1.5 w-1.5 rounded-full ${isRecording ? "bg-red-500 animate-pulse" : isDone ? "bg-emerald-500" : "bg-slate-300"}`} />
-              <span className="text-[10px] font-semibold text-ink/30 uppercase tracking-wider">{language} · Slang-aware NLP</span>
+              <span className="text-[10px] font-semibold text-ink/30 uppercase tracking-wider">{language} · 10-pattern NLP</span>
             </div>
           </div>
         </div>

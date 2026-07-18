@@ -61,6 +61,12 @@ import {
   isAssistantInfoQueryText,
   resolveAssistantProduct
 } from "@/lib/assistant-command-engine";
+import { 
+  intentRouter, 
+  entityExtractor, 
+  contextManager, 
+  IntentCategory 
+} from "@/lib/enterprise-ai";
 
 const queryClient = new QueryClient();
 type Task = "credit" | "payment" | "products" | "ai";
@@ -1334,11 +1340,31 @@ function RuralRetailOS() {
     const spoken = text.trim();
     if (!spoken) return;
 
+    // ── Layer 1: Product info queries → AI assistant ──────────────────────────
     if (isProductInfoQueryText(spoken)) {
       setAiQueryOverride(spoken);
       setView("ai");
       setActiveTask("ai");
       setStatus(`Answering product question: "${spoken}"`);
+      return;
+    }
+
+    // ── Layer 2: Business queries → AI assistant ──────────────────────────────
+    // Covers: "today's sales", "who owes most", "total outstanding",
+    //         "low stock", "pending balance", "how many customers", etc.
+    const businessQueryWords = [
+      "sales", "today", "report", "outstanding", "total credit", "pending",
+      "who owes", "owes most", "low stock", "restock", "running low",
+      "how many customers", "customers registered", "ledger", "summary",
+      "daily", "weekly", "collection", "revenue",
+      "விற்பனை", "அறிக்கை", "নিলুவை", "ಮಾರಾಟ", "నివేదిక",
+    ];
+    const spokenLower = spoken.toLowerCase();
+    if (businessQueryWords.some(w => spokenLower.includes(w))) {
+      setAiQueryOverride(spoken);
+      setView("ai");
+      setActiveTask("ai");
+      setStatus(`📊 Fetching business data for: "${spoken}"`);
       return;
     }
 
@@ -1348,14 +1374,40 @@ function RuralRetailOS() {
       const cmd = parseLocalCommand(spoken, language);
       const intent = String(cmd.intent ?? "UNKNOWN").toUpperCase();
 
+      // ── UNKNOWN → send to AI panel (Gemini handles it) ──────────────────
       if (intent === "UNKNOWN") {
         setView("ai");
         setActiveTask("ai");
         setAiQueryOverride(spoken);
-        setStatus(`I heard "${spoken}", but I could not identify a shop action. Try: add 1 litre milk to Avinash account.`);
+        setStatus(`🤔 Thinking about: "${spoken}"`);
         return;
       }
 
+      // ── SHOW_REPORT → AI panel ────────────────────────────────────────────
+      if (intent === "SHOW_REPORT") {
+        setView("ai");
+        setActiveTask("ai");
+        setAiQueryOverride(spoken);
+        setStatus(`📊 Generating report…`);
+        return;
+      }
+
+      // ── ASK_BALANCE → find customer, then show in AI panel ────────────────
+      if (intent === "ASK_BALANCE") {
+        const cust = cmd.customerName ? findCustomerFuzzy(cmd.customerName) ?? selectedCustomer : selectedCustomer;
+        if (cust) {
+          const balMsg = `${cust.name}'s outstanding balance is ₹${Number(cust.outstandingBalance ?? 0).toLocaleString()}.`;
+          setView("ai");
+          setActiveTask("ai");
+          setAiQueryOverride(balMsg);
+          setStatus(`💰 ${balMsg}`);
+        } else {
+          setStatus(`❌ Customer not found. Say: "Avinash balance" or open an account first.`);
+        }
+        return;
+      }
+
+      // ── ADD_PURCHASE validation ────────────────────────────────────────────
       if (intent === "ADD_PURCHASE") {
         if (!cmd.customerName && !selectedCustomer) {
           setStatus(`I heard "${spoken}", but I could not identify the customer. Say: add milk to Avinash account.`);
@@ -1369,6 +1421,7 @@ function RuralRetailOS() {
         }
       }
 
+      // ── RECEIVE_PAYMENT validation ─────────────────────────────────────────
       if (intent === "RECEIVE_PAYMENT") {
         if (!cmd.customerName && !selectedCustomer) {
           setStatus(`I heard "${spoken}", but I could not identify who paid.`);
@@ -1390,7 +1443,305 @@ function RuralRetailOS() {
     }
   }
 
-  function handleVoiceCommand(cmd: {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ENHANCED VOICE COMMAND HANDLER WITH MULTI-INTENT SUPPORT
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  async function handleVoiceCommand(cmd: {
+    intent: string;
+    customerName?: string;
+    productAlias?: string;
+    amount?: string;
+    quantity?: string;
+  }) {
+    if (!cmd || !cmd.intent) return;
+
+    try {
+      // Build context from current session state
+      const conversationContext = contextManager.buildContext(
+        selectedCustomer || undefined,
+        customers,
+        products
+      );
+
+      // Reconstruct original query from command
+      const query = reconstructQuery(cmd);
+      
+      // Use Enterprise AI to classify intent
+      const classification = intentRouter.classify(query, language, conversationContext);
+      
+      // Extract entities
+      const entities = entityExtractor.extract(
+        query,
+        language,
+        customers,
+        products
+      );
+
+      // Update context manager
+      contextManager.addMessage({
+        role: "user",
+        content: query,
+        timestamp: Date.now(),
+        language,
+      });
+
+      console.log("🎯 Intent Classification:", classification);
+      console.log("📦 Extracted Entities:", entities);
+
+      // Execute primary intent
+      await executeIntent(classification.intent, entities, cmd);
+
+      // Execute sub-intents (multi-intent support)
+      if (classification.multiIntent && classification.subIntents) {
+        setStatus(`Executing ${classification.subIntents.length + 1} actions...`);
+        
+        for (const subIntent of classification.subIntents) {
+          // Small delay between actions for better UX
+          await new Promise(resolve => setTimeout(resolve, 300));
+          await executeIntent(subIntent, entities, cmd);
+        }
+        
+        setStatus(`✅ All ${classification.subIntents.length + 1} actions completed!`);
+      }
+
+    } catch (error) {
+      console.error("❌ Enhanced voice command failed:", error);
+      setStatus("Sorry, something went wrong processing your command.");
+    }
+  }
+
+  // Helper: Reconstruct query from parsed command
+  function reconstructQuery(cmd: any): string {
+    const parts: string[] = [];
+    
+    if (cmd.intent === "OPEN_CUSTOMER" && cmd.customerName) {
+      parts.push("open", cmd.customerName);
+    } else if (cmd.intent === "ADD_PURCHASE") {
+      if (cmd.customerName) parts.push("open", cmd.customerName);
+      parts.push("add");
+      if (cmd.quantity) parts.push(cmd.quantity);
+      if (cmd.productAlias) parts.push(cmd.productAlias);
+    } else if (cmd.intent === "RECEIVE_PAYMENT") {
+      if (cmd.customerName) parts.push(cmd.customerName);
+      parts.push("paid");
+      if (cmd.amount) parts.push(cmd.amount);
+    }
+    
+    return parts.join(" ");
+  }
+
+  // Helper: Execute single intent
+  async function executeIntent(
+    intent: IntentCategory, 
+    entities: any, 
+    originalCmd: any
+  ) {
+    console.log(`🔧 Executing intent: ${intent}`);
+
+    switch (intent) {
+      // ─── ACCOUNT OPERATIONS ─────────────────────────────────────────────────
+      case IntentCategory.ACCOUNT_OPEN:
+        if (entities.customers && entities.customers.length > 0) {
+          const customer = entities.customers[0].customer;
+          openCustomer(customer);
+          contextManager.setActiveCustomer(customer.id);
+          setStatus(`✅ Opened ${customer.name}'s account`);
+        } else if (originalCmd.customerName) {
+          const query = originalCmd.customerName.toLowerCase().trim();
+          const matched = findCustomerFuzzy(originalCmd.customerName) ?? 
+                        customers.find(c => c.name.toLowerCase().includes(query));
+          if (matched) {
+            openCustomer(matched);
+            contextManager.setActiveCustomer(matched.id);
+            setStatus(`✅ Opened ${matched.name}'s account`);
+          } else {
+            setStatus(`❌ No customer found: "${originalCmd.customerName}"`);
+          }
+        } else {
+          setStatus("Which customer account should I open?");
+          setView("customers");
+        }
+        break;
+
+      case IntentCategory.ACCOUNT_BALANCE:
+        const balanceCustomer = selectedCustomer || 
+          (entities.customers && entities.customers.length > 0 
+            ? entities.customers[0].customer 
+            : null);
+        
+        if (balanceCustomer) {
+          setActiveTask("ai");
+          setStatus(`${balanceCustomer.name}'s balance is ₹${balanceCustomer.outstandingBalance}`);
+        } else {
+          setStatus("Which customer's balance do you want to check?");
+        }
+        break;
+
+      // ─── BILLING OPERATIONS ─────────────────────────────────────────────────
+      case IntentCategory.BILLING_ADD_PURCHASE:
+        let creditCustomer = selectedCustomer;
+        
+        // Select customer if provided
+        if (entities.customers && entities.customers.length > 0 && 
+            (!selectedCustomer || selectedCustomer.id !== entities.customers[0].customer.id)) {
+          creditCustomer = entities.customers[0].customer;
+          openCustomer(creditCustomer);
+          contextManager.setActiveCustomer(creditCustomer.id);
+        } else if (originalCmd.customerName && !creditCustomer) {
+          const query = originalCmd.customerName.toLowerCase().trim();
+          const matched = findCustomerFuzzy(originalCmd.customerName) ?? 
+                        customers.find(c => c.name.toLowerCase().includes(query));
+          if (matched) {
+            creditCustomer = matched;
+            openCustomer(matched);
+            contextManager.setActiveCustomer(matched.id);
+          }
+        }
+
+        if (!creditCustomer) {
+          setStatus("❌ Please specify which customer account to add to");
+          setView("customers");
+          return;
+        }
+
+        setView("billing");
+        setActiveTask("credit");
+
+        // Find product
+        let productToAdd = selectedProduct;
+        
+        if (entities.products && entities.products.length > 0) {
+          productToAdd = entities.products[0].product;
+          setSelectedProduct(productToAdd);
+          contextManager.setActiveProduct(productToAdd.id);
+          
+          // Get quantity from entity or default to 1
+          const qty = entities.products[0].quantity?.toString() || "1";
+          setVoiceQuantity(qty);
+          
+          // Execute immediately
+          await executeSaveCredit(productToAdd, qty);
+          setStatus(`✅ Added ${qty} ${productToAdd.name} to ${creditCustomer.name}'s account`);
+          
+        } else if (originalCmd.productAlias) {
+          const alias = originalCmd.productAlias.toLowerCase().trim();
+          const matchedProduct = resolveProductFromVoice(alias, alias, language);
+          if (matchedProduct) {
+            productToAdd = matchedProduct;
+            setSelectedProduct(matchedProduct);
+            contextManager.setActiveProduct(matchedProduct.id);
+            
+            const qty = originalCmd.quantity || "1";
+            setVoiceQuantity(qty);
+            
+            await executeSaveCredit(productToAdd, qty);
+            setStatus(`✅ Added ${qty} ${matchedProduct.name} to ${creditCustomer.name}'s account`);
+          } else {
+            setStatus(`❌ Product not found: "${originalCmd.productAlias}"`);
+          }
+        } else {
+          setStatus(`❌ Please specify which product to add`);
+        }
+        break;
+
+      case IntentCategory.BILLING_RECEIVE_PAYMENT:
+        let paymentCustomer = selectedCustomer;
+        
+        // Select customer if provided
+        if (entities.customers && entities.customers.length > 0 && 
+            (!selectedCustomer || selectedCustomer.id !== entities.customers[0].customer.id)) {
+          paymentCustomer = entities.customers[0].customer;
+          openCustomer(paymentCustomer);
+          contextManager.setActiveCustomer(paymentCustomer.id);
+        } else if (originalCmd.customerName && !paymentCustomer) {
+          const query = originalCmd.customerName.toLowerCase().trim();
+          const matched = findCustomerFuzzy(originalCmd.customerName) ?? 
+                        customers.find(c => c.name.toLowerCase().includes(query));
+          if (matched) {
+            paymentCustomer = matched;
+            openCustomer(matched);
+            contextManager.setActiveCustomer(matched.id);
+          }
+        }
+
+        if (!paymentCustomer) {
+          setStatus("❌ Please specify which customer made the payment");
+          setView("customers");
+          return;
+        }
+
+        setView("billing");
+        setActiveTask("payment");
+
+        // Get amount
+        let amount = 0;
+        if (entities.amounts && entities.amounts.length > 0) {
+          amount = entities.amounts[0].value;
+        } else if (originalCmd.amount) {
+          amount = Number(originalCmd.amount);
+        }
+
+        if (amount > 0) {
+          setVoiceAmount(amount.toString());
+          await executeSavePayment(amount);
+          setStatus(`✅ Recorded payment of ₹${amount} from ${paymentCustomer.name}`);
+        } else {
+          setVoiceAmount("");
+          setStatus(`❌ Please specify the payment amount`);
+        }
+        break;
+
+      // ─── PRODUCT QUERIES ────────────────────────────────────────────────────
+      case IntentCategory.PRODUCT_PRICE:
+        if (entities.products && entities.products.length > 0) {
+          const product = entities.products[0].product;
+          setStatus(`${product.name} costs ₹${product.sellingPrice}`);
+        } else {
+          setStatus("Which product's price do you want to know?");
+        }
+        break;
+
+      case IntentCategory.PRODUCT_STOCK:
+        if (entities.products && entities.products.length > 0) {
+          const product = entities.products[0].product;
+          setStatus(`${product.name}: ${product.stockQuantity} ${product.unit} in stock`);
+        } else {
+          setStatus("Which product's stock do you want to check?");
+        }
+        break;
+
+      // ─── REPORTS ────────────────────────────────────────────────────────────
+      case IntentCategory.REPORT_DAILY:
+      case IntentCategory.REPORT_MONTHLY:
+      case IntentCategory.BI_TODAY_SALES:
+        setView("ai");
+        setActiveTask("ai");
+        setStatus("📊 Opening reports and AI insights...");
+        break;
+
+      // ─── CHAT INTENTS ───────────────────────────────────────────────────────
+      case IntentCategory.CHAT_GREETING:
+        setStatus("👋 Hello! How can I help you today?");
+        break;
+
+      case IntentCategory.CHAT_HELP:
+        setStatus("💡 I can help you open accounts, add purchases, record payments, and more. Try saying 'Open Avinash and add milk'");
+        break;
+
+      case IntentCategory.CHAT_THANK:
+        setStatus("😊 You're welcome! Happy to help!");
+        break;
+
+      // ─── FALLBACK ───────────────────────────────────────────────────────────
+      default:
+        // Keep original command handling as fallback
+        handleLegacyVoiceCommand(originalCmd);
+    }
+  }
+
+  // Legacy handler for backward compatibility
+  function handleLegacyVoiceCommand(cmd: {
     intent: string;
     customerName?: string;
     productAlias?: string;
@@ -2962,31 +3313,57 @@ function localBusinessAnswer(
     .filter((customer) => Number(customer.outstandingBalance ?? "0") > 0)
     .sort((a, b) => Number(b.outstandingBalance ?? "0") - Number(a.outstandingBalance ?? "0"));
 
-  if (normalized.includes("who owes") || normalized.includes("owes most") || normalized.includes("highest pending")) {
+  // ── Who owes most ──────────────────────────────────────────────────────────
+  if (normalized.includes("who owes") || normalized.includes("owes most") || normalized.includes("highest pending") || normalized.includes("maximum due")) {
     const top = pendingCustomers[0];
-    return top ? `${top.name} owes the most: Rs.${Number(top.outstandingBalance ?? "0").toLocaleString()}.` : "No customer has pending credit right now.";
+    return top ? `${top.name} owes the most: ₹${Number(top.outstandingBalance ?? "0").toLocaleString()}.` : "No customer has pending credit right now.";
   }
 
-  if (normalized.includes("pending customers") || normalized.includes("pending balance above")) {
+  // ── Top N debtors ──────────────────────────────────────────────────────────
+  if (normalized.includes("top") && (normalized.includes("debtor") || normalized.includes("pending") || normalized.includes("due"))) {
+    const top5 = pendingCustomers.slice(0, 5);
+    return top5.length
+      ? `Top debtors: ${top5.map((c, i) => `${i + 1}. ${c.name} ₹${Number(c.outstandingBalance ?? 0).toLocaleString()}`).join(", ")}.`
+      : "No pending dues found.";
+  }
+
+  // ── Pending customers list ─────────────────────────────────────────────────
+  if (normalized.includes("pending customers") || normalized.includes("pending balance above") || normalized.includes("who has due")) {
     const threshold = Number(extractAssistantAmount(text) ?? "0");
     const rows = pendingCustomers.filter((customer) => Number(customer.outstandingBalance ?? "0") >= threshold).slice(0, 6);
     return rows.length
-      ? `Pending customers: ${rows.map((customer) => `${customer.name} Rs.${Number(customer.outstandingBalance ?? "0").toLocaleString()}`).join(", ")}.`
+      ? `Pending customers (${rows.length}): ${rows.map((customer) => `${customer.name} ₹${Number(customer.outstandingBalance ?? "0").toLocaleString()}`).join(", ")}.`
       : "No pending customers match that amount.";
   }
 
-  if (normalized.includes("how many customers") || normalized.includes("customers registered")) {
-    return `${customers.length} customers are registered.`;
+  // ── Customer count ─────────────────────────────────────────────────────────
+  if (normalized.includes("how many customers") || normalized.includes("customers registered") || normalized.includes("total customers")) {
+    const withDue = pendingCustomers.length;
+    return `${customers.length} customers registered. ${withDue} have pending dues.`;
   }
 
-  if (normalized.includes("outstanding") || normalized.includes("total credit") || normalized.includes("credit outstanding")) {
-    return `Total outstanding credit is Rs.${totalPending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
+  // ── Product count ──────────────────────────────────────────────────────────
+  if (normalized.includes("how many products") || normalized.includes("total products") || normalized.includes("products in catalog")) {
+    return `${products.length} products are in the catalog.`;
   }
 
-  if (normalized.includes("today") && (normalized.includes("sale") || normalized.includes("sales"))) {
-    return `Today's sales are Rs.${todaySales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Credit sales: Rs.${todayCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Payments: Rs.${todayPayments.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
+  // ── Total outstanding ──────────────────────────────────────────────────────
+  if (normalized.includes("outstanding") || normalized.includes("total credit") || normalized.includes("credit outstanding") || normalized.includes("total due") || normalized.includes("total pending")) {
+    return `Total outstanding credit: ₹${totalPending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from ${pendingCustomers.length} customers.`;
   }
 
+  // ── Today's sales / summary ────────────────────────────────────────────────
+  if ((normalized.includes("today") || normalized.includes("aaj") || normalized.includes("indru")) &&
+      (normalized.includes("sale") || normalized.includes("sales") || normalized.includes("collection") || normalized.includes("summary") || normalized.includes("report"))) {
+    return `📊 Today's Summary — Sales: ₹${todaySales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Credit sales: ₹${todayCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Payments collected: ₹${todayPayments.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
+  }
+
+  // ── Today payments only ────────────────────────────────────────────────────
+  if (normalized.includes("today") && (normalized.includes("payment") || normalized.includes("collected") || normalized.includes("received"))) {
+    return `Payments collected today: ₹${todayPayments.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
+  }
+
+  // ── Low stock ──────────────────────────────────────────────────────────────
   if (normalized.includes("low stock") || normalized.includes("running low") || normalized.includes("restock")) {
     const lowStock = products
       .filter((product) => Number(product.stockQuantity ?? "9999") <= 10)
@@ -2995,7 +3372,19 @@ function localBusinessAnswer(
       return `Restock needed: ${lowStock.map((product) => `${getProductName(product, language)} (${Number(product.stockQuantity ?? 0).toLocaleString()} left)`).join(", ")}.`;
     }
     const fastMoving = products.slice(0, 5).map((product) => getProductName(product, language)).join(", ");
-    return `No low-stock alert from current catalog. Check fast movers today: ${fastMoving}.`;
+    return `No low-stock alert from current catalog. Fast movers: ${fastMoving}.`;
+  }
+
+  // ── Individual customer balance by name ────────────────────────────────────
+  // e.g. "Avinash balance", "Kumar ka balance", "what does Lakshmi owe"
+  if (normalized.includes("balance") || normalized.includes("due") || normalized.includes("outstanding") || normalized.includes("owe")) {
+    const match = customers.find(c => normalized.includes(c.name.toLowerCase()) || normalized.includes(c.name.toLowerCase().split(" ")[0]));
+    if (match) {
+      const bal = Number(match.outstandingBalance ?? 0);
+      return bal > 0
+        ? `${match.name} has ₹${bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} outstanding.`
+        : `${match.name} has no pending dues. ✅`;
+    }
   }
 
   return null;
