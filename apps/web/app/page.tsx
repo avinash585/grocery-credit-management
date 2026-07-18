@@ -1571,19 +1571,20 @@ function RuralRetailOS() {
         break;
 
       // ─── BILLING OPERATIONS ─────────────────────────────────────────────────
-      case IntentCategory.BILLING_ADD_PURCHASE:
-        let creditCustomer = selectedCustomer;
+      case IntentCategory.BILLING_ADD_PURCHASE: {
+        let creditCustomer: Customer | null = selectedCustomer;
         
         // Select customer if provided
         if (entities.customers && entities.customers.length > 0 && 
             (!selectedCustomer || selectedCustomer.id !== entities.customers[0].customer.id)) {
-          creditCustomer = entities.customers[0].customer;
-          openCustomer(creditCustomer);
-          contextManager.setActiveCustomer("main", creditCustomer);
+          const c = entities.customers[0].customer as Customer;
+          creditCustomer = c;
+          openCustomer(c);
+          contextManager.setActiveCustomer("main", c);
         } else if (originalCmd.customerName && !creditCustomer) {
-          const query = originalCmd.customerName.toLowerCase().trim();
+          const q = originalCmd.customerName.toLowerCase().trim();
           const matched = findCustomerFuzzy(originalCmd.customerName) ?? 
-                        customers.find(c => c.name.toLowerCase().includes(query));
+                        customers.find(c => c.name.toLowerCase().includes(q));
           if (matched) {
             creditCustomer = matched;
             openCustomer(matched);
@@ -1597,6 +1598,7 @@ function RuralRetailOS() {
           return;
         }
 
+        const resolvedCreditCustomer: Customer = creditCustomer;
         setView("billing");
         setActiveTask("credit");
 
@@ -1607,13 +1609,10 @@ function RuralRetailOS() {
           productToAdd = entities.products[0].product;
           setSelectedProduct(productToAdd);
           
-          // Get quantity from entity or default to 1
           const qty = entities.products[0].quantity?.toString() || "1";
           setVoiceQuantity(qty);
-          
-          // Execute immediately
           await executeSaveCredit(productToAdd, qty);
-          setStatus(`✅ Added ${qty} ${productToAdd.name} to ${creditCustomer.name}'s account`);
+          setStatus(`✅ Added ${qty} ${productToAdd.name} to ${resolvedCreditCustomer.name}'s account`);
           
         } else if (originalCmd.productAlias) {
           const alias = originalCmd.productAlias.toLowerCase().trim();
@@ -1621,12 +1620,10 @@ function RuralRetailOS() {
           if (matchedProduct) {
             productToAdd = matchedProduct;
             setSelectedProduct(matchedProduct);
-            
             const qty = originalCmd.quantity || "1";
             setVoiceQuantity(qty);
-            
             await executeSaveCredit(productToAdd, qty);
-            setStatus(`✅ Added ${qty} ${matchedProduct.name} to ${creditCustomer.name}'s account`);
+            setStatus(`✅ Added ${qty} ${matchedProduct.name} to ${resolvedCreditCustomer.name}'s account`);
           } else {
             setStatus(`❌ Product not found: "${originalCmd.productAlias}"`);
           }
@@ -1634,20 +1631,22 @@ function RuralRetailOS() {
           setStatus(`❌ Please specify which product to add`);
         }
         break;
+      }
 
-      case IntentCategory.BILLING_RECEIVE_PAYMENT:
-        let paymentCustomer = selectedCustomer;
+      case IntentCategory.BILLING_RECEIVE_PAYMENT: {
+        let paymentCustomer: Customer | null = selectedCustomer;
         
         // Select customer if provided
         if (entities.customers && entities.customers.length > 0 && 
             (!selectedCustomer || selectedCustomer.id !== entities.customers[0].customer.id)) {
-          paymentCustomer = entities.customers[0].customer;
-          openCustomer(paymentCustomer);
-          contextManager.setActiveCustomer("main", paymentCustomer);
+          const pc = entities.customers[0].customer as Customer;
+          paymentCustomer = pc;
+          openCustomer(pc);
+          contextManager.setActiveCustomer("main", pc);
         } else if (originalCmd.customerName && !paymentCustomer) {
-          const query = originalCmd.customerName.toLowerCase().trim();
+          const pq = originalCmd.customerName.toLowerCase().trim();
           const matched = findCustomerFuzzy(originalCmd.customerName) ?? 
-                        customers.find(c => c.name.toLowerCase().includes(query));
+                        customers.find(c => c.name.toLowerCase().includes(pq));
           if (matched) {
             paymentCustomer = matched;
             openCustomer(matched);
@@ -1661,26 +1660,27 @@ function RuralRetailOS() {
           return;
         }
 
+        const resolvedPaymentCustomer: Customer = paymentCustomer;
         setView("billing");
         setActiveTask("payment");
 
-        // Get amount
-        let amount = 0;
+        let payAmount = 0;
         if (entities.amounts && entities.amounts.length > 0) {
-          amount = entities.amounts[0].value;
+          payAmount = entities.amounts[0].value;
         } else if (originalCmd.amount) {
-          amount = Number(originalCmd.amount);
+          payAmount = Number(originalCmd.amount);
         }
 
-        if (amount > 0) {
-          setVoiceAmount(amount.toString());
-          await executeSavePayment(amount);
-          setStatus(`✅ Recorded payment of ₹${amount} from ${paymentCustomer.name}`);
+        if (payAmount > 0) {
+          setVoiceAmount(payAmount.toString());
+          await executeSavePayment(payAmount);
+          setStatus(`✅ Recorded payment of ₹${payAmount} from ${resolvedPaymentCustomer.name}`);
         } else {
           setVoiceAmount("");
           setStatus(`❌ Please specify the payment amount`);
         }
         break;
+      }
 
       // ─── PRODUCT QUERIES ────────────────────────────────────────────────────
       case IntentCategory.PRODUCT_PRICE:
