@@ -1179,7 +1179,7 @@ function RuralRetailOS() {
       }
 
     } else if (intent === "ADD_PURCHASE") {
-      // ── Step 1: find customer (do NOT rely on selectedCustomer state) ──────
+      // ── Step 1: find customer ──────────────────────────────────────────────
       const commandMentionsCustomer = Boolean(cmd.customerName && cmd.customerName.trim());
       const cust = findCustomerFuzzy(cmd.customerName ?? "") ?? (!commandMentionsCustomer ? selectedCustomer : null);
       if (!cust) {
@@ -1187,35 +1187,41 @@ function RuralRetailOS() {
         return;
       }
 
-      // ── Step 2: find product ────────────────────────────────────────────────
+      // ── Step 2: find product ───────────────────────────────────────────────
       const prod = resolveProduct(cmd.productAlias);
       if (!prod) {
         setStatus(`❌ Product "${cmd.productAlias ?? ""}" not found in catalog.`);
         return;
       }
 
-      // ── Step 3: parse quantity ──────────────────────────────────────────────
+      // ── Step 3: parse quantity ─────────────────────────────────────────────
       const qtyStr = (cmd.quantity ?? "1").match(/\d+(\.\d+)?/)?.[0] ?? "1";
-      const total   = Number(prod.sellingPrice) * Number(qtyStr);
 
-      // ── Step 4: set UI state so screen opens correctly ──────────────────────
+      // ── Step 4: open account and navigate to billing ───────────────────────
+      openCustomer(cust);
       setSelectedCustomer(cust);
       setSelectedProduct(prod);
       setView("billing");
       setActiveTask("credit");
-      setBusy(true);
-      setStatus(`⏳ Adding ${qtyStr} ${prod.name} → ${cust.name}'s account…`);
+      setStatus(`⏳ Adding ${qtyStr} × ${prod.name} → ${cust.name}'s account…`);
 
-      // ── Step 5: save — call API directly with `cust.id` (no stale state) ───
+      // ── Step 5: add to cart so it shows in billing view ───────────────────
+      // Clear old cart first, then add the new item
+      setCart([{ product: prod, quantity: qtyStr }]);
+      setVoiceQuantity(qtyStr);
+
+      // ── Step 6: save after short delay (allow React state to settle) ───────
+      setBusy(true);
+      await new Promise(r => setTimeout(r, 150));
       try {
+        const total = Number(prod.sellingPrice) * Number(qtyStr);
         if (demoMode) {
-          // Demo mode: update local state directly
           const updatedCustomer = applyResolvedCustomerBalance(cust, total);
           setTodayCreditVal(prev => prev + total);
           setTodaySalesVal(prev => prev + total);
-          setStatus(`✅ ${qtyStr} ${prod.name} added to ${cust.name}'s account! (₹${total.toFixed(2)})`);
-
-          // WhatsApp notification
+          setCart([]);
+          setSelectedProduct(null);
+          setStatus(`✅ ${qtyStr} × ${prod.name} added to ${cust.name}'s account! (₹${total.toFixed(2)})`);
           if (cust.phone) {
             notifyCreditSale({
               phone: cust.phone,
@@ -1229,7 +1235,6 @@ function RuralRetailOS() {
             }).catch(() => {});
           }
         } else {
-          // Live mode: call API with resolved cust.id directly
           const bill = await createCreditBill({
             customerId: cust.id,
             creditBill: true,
@@ -1239,9 +1244,9 @@ function RuralRetailOS() {
           const updatedCustomer = applyResolvedCustomerBalance(cust, billTotal);
           setTodayCreditVal(prev => prev + billTotal);
           setTodaySalesVal(prev => prev + billTotal);
-          setStatus(`✅ ${qtyStr} ${prod.name} added to ${cust.name}'s account! (₹${billTotal.toFixed(2)})`);
-
-          // WhatsApp notification
+          setCart([]);
+          setSelectedProduct(null);
+          setStatus(`✅ ${qtyStr} × ${prod.name} added to ${cust.name}'s account! (₹${billTotal.toFixed(2)})`);
           if (cust.phone) {
             notifyCreditSale({
               phone: cust.phone,
@@ -1256,13 +1261,15 @@ function RuralRetailOS() {
           }
         }
       } catch {
-        // Fallback to demo mode on API failure
+        // Fallback: still show success in demo mode
+        const total = Number(prod.sellingPrice) * Number(qtyStr);
         applyResolvedCustomerBalance(cust, total);
         setTodayCreditVal(prev => prev + total);
         setTodaySalesVal(prev => prev + total);
-        setStatus(`✅ ${qtyStr} ${prod.name} added to ${cust.name}'s account! (₹${total.toFixed(2)})`);
-      } finally {
+        setCart([]);
         setSelectedProduct(null);
+        setStatus(`✅ ${qtyStr} × ${prod.name} added to ${cust.name}'s account! (₹${total.toFixed(2)})`);
+      } finally {
         setBusy(false);
       }
 
@@ -1340,31 +1347,47 @@ function RuralRetailOS() {
     const spoken = text.trim();
     if (!spoken) return;
 
-    // ── Layer 1: Product info queries → AI assistant ──────────────────────────
+    // ── Layer 1: Product price/stock queries → instant local answer ───────────
     if (isProductInfoQueryText(spoken)) {
-      setAiQueryOverride(spoken);
-      setView("ai");
-      setActiveTask("ai");
-      setStatus(`Answering product question: "${spoken}"`);
+      const instantAnswer = localProductQueryAnswer(spoken, products, language);
+      if (instantAnswer) {
+        // Show answer immediately in status bar
+        const clean = instantAnswer.replace(/\*\*/g, "");
+        setStatus(`🎙️ ${clean}`);
+        // Also send to AI panel for richer display
+        setAiQueryOverride(spoken);
+        setView("ai");
+        setActiveTask("ai");
+      } else {
+        // Let Gemini answer it
+        setAiQueryOverride(spoken);
+        setView("ai");
+        setActiveTask("ai");
+        setStatus(`🔍 Looking up: "${spoken}"`);
+      }
       return;
     }
 
     // ── Layer 2: Business queries → AI assistant ──────────────────────────────
-    // Covers: "today's sales", "who owes most", "total outstanding",
-    //         "low stock", "pending balance", "how many customers", etc.
     const businessQueryWords = [
       "sales", "today", "report", "outstanding", "total credit", "pending",
       "who owes", "owes most", "low stock", "restock", "running low",
       "how many customers", "customers registered", "ledger", "summary",
-      "daily", "weekly", "collection", "revenue",
-      "விற்பனை", "அறிக்கை", "নিলুவை", "ಮಾರಾಟ", "నివేదిక",
+      "daily", "weekly", "collection", "revenue", "balance", "due",
+      "profit", "income", "earnings", "overdue", "unpaid",
+      "விற்பனை", "அறிக்கை", "ಮಾರಾಟ", "నివేదిక", "बिक्री", "रिपोर्ट",
     ];
     const spokenLower = spoken.toLowerCase();
     if (businessQueryWords.some(w => spokenLower.includes(w))) {
+      // Try instant local answer first
+      const instantBizAnswer = localBusinessAnswer(spoken, customers, products, todaySalesVal, todayCreditVal, todayPaymentsVal, language);
+      if (instantBizAnswer) {
+        setStatus(`📊 ${instantBizAnswer}`);
+      }
+      // Always open AI panel too for full display
       setAiQueryOverride(spoken);
       setView("ai");
       setActiveTask("ai");
-      setStatus(`📊 Fetching business data for: "${spoken}"`);
       return;
     }
 
@@ -3175,31 +3198,57 @@ function findCatalogProductForQuestion(text: string, products: Product[], langua
 }
 
 function localProductQueryAnswer(text: string, products: Product[], language: Language) {
-  const analysis = analyzeAssistantCommand(text, [], products, language, null);
-  if (analysis.intent === "GET_PRODUCT_PRICE" || analysis.intent === "GET_STOCK") {
-    return formatProductAnswer(analysis, language);
-  }
-  if (!isAssistantInfoQuery(text) || isAssistantMutationCommand(text)) return null;
+  const normalized = text.toLowerCase().trim();
+
+  // ── Resolve product from text ─────────────────────────────────────────────
   const resolution = resolveProductEntity(text, products, language);
   const product = resolution.product;
+
   if (!product) {
-    if (resolution.alternatives.length > 0) {
-      return `I found similar products but confidence is ${Math.round(resolution.confidence * 100)}%. Did you mean ${resolution.alternatives.map((item) => getProductName(item, language)).join(" or ")}?`;
+    // Try analyzeAssistantCommand as backup
+    const analysis = analyzeAssistantCommand(text, [], products, language, null);
+    if (analysis.intent === "GET_PRODUCT_PRICE" || analysis.intent === "GET_STOCK") {
+      return formatProductAnswer(analysis, language);
     }
-    return "I could not identify the product confidently. Please say the exact item name, for example Milk, Rice, or Sugar.";
+    if (!isAssistantInfoQuery(text) || isAssistantMutationCommand(text)) return null;
+    if (resolution.alternatives.length > 0) {
+      const altNames = resolution.alternatives.map(p => getProductName(p, language)).join(", ");
+      return `Did you mean: ${altNames}? Please say the exact product name.`;
+    }
+    return null; // Let Gemini handle unknown products
   }
+
   const name = getProductName(product, language);
-  const unit = product.unit ? ` per ${product.unit}` : "";
-  const stock = product.stockQuantity ? ` Stock: ${Number(product.stockQuantity).toLocaleString()}${product.unit ? ` ${product.unit}` : ""}.` : "";
+  const price = Number(product.sellingPrice ?? "0");
+  const unitLabel = product.unit ?? "unit";
+  const stockText = product.stockQuantity
+    ? ` Available stock: ${Number(product.stockQuantity).toLocaleString()} ${unitLabel}.`
+    : "";
+  const mrpText = product.mrp
+    ? ` MRP: ₹${Number(product.mrp).toFixed(2)}.`
+    : "";
+
+  // ── Extract quantity from text e.g. "1 litre", "2 kg", "500 ml" ──────────
   const { quantity, unit: spokenUnit } = extractQuantityAndUnit(text);
-  const price = Number(product.sellingPrice);
   const qty = Number(quantity ?? "0");
-  const mrp = product.mrp ? ` MRP: Rs.${Number(product.mrp).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.` : "";
+
+  // ── Stock query ───────────────────────────────────────────────────────────
+  if (/\b(stock|available|left|remaining|inventory)\b/.test(normalized)) {
+    if (product.stockQuantity) {
+      return `📦 ${name}: ${Number(product.stockQuantity).toLocaleString()} ${unitLabel} in stock. Price: ₹${price.toFixed(2)} per ${unitLabel}.`;
+    }
+    return `📦 ${name} is available at ₹${price.toFixed(2)} per ${unitLabel}. Stock count not tracked.`;
+  }
+
+  // ── Quantity-specific price query e.g. "price of 2 kg rice" ─────────────
   if (qty > 0) {
     const total = price * qty;
-    return `Intent: GET_PRODUCT_PRICE. Product: ${name}. Quantity: ${quantity}. Unit: ${spokenUnit ?? product.unit ?? "unit"}. ${quantity} ${spokenUnit ?? product.unit ?? ""} of ${name} costs Rs.${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Price: Rs.${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${unit}.${stock}${mrp} Confidence: ${Math.round(resolution.confidence * 100)}%.`;
+    const displayUnit = spokenUnit ?? unitLabel;
+    return `💰 ${qty} ${displayUnit} of **${name}** costs **₹${total.toFixed(2)}**. (₹${price.toFixed(2)} per ${unitLabel})${stockText}${mrpText}`;
   }
-  return `Intent: GET_PRODUCT_PRICE. Product: ${name}. Current Price: Rs.${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${unit}.${stock}${mrp} Confidence: ${Math.round(resolution.confidence * 100)}%.`;
+
+  // ── General price query ───────────────────────────────────────────────────
+  return `💰 **${name}** — Price: **₹${price.toFixed(2)} per ${unitLabel}**.${stockText}${mrpText}`;
 }
 
 function findMentionedCustomer(text: string, customers: Customer[]) {
